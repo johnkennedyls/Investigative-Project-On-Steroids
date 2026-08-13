@@ -1,0 +1,4 @@
+{"timestamp": "2026-04-10T07:37:02.118073", "success": true, "error": null, "metadata_hits": 10, "metadata_misses": 0, "avg_latency_ms": 0}
+{"timestamp": "2026-04-10T08:29:30.947947", "success": true, "error": null, "metadata_hits": 1, "metadata_misses": 9, "avg_latency_ms": 0}
+{"timestamp": "2026-04-14T12:46:09.835568", "success": true, "error": null, "metadata_hits": 0, "metadata_misses": 10, "avg_latency_ms": 0}
+{"timestamp": "2026-04-14T12:48:55.461145", "success": true, "error": null, "metadata_hits": 2, "metadata_misses": 8, "avg_latency_ms": 0}

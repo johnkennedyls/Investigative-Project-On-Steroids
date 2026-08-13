@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>⚡ EchoPulse AI - Motor de Recomendación Musical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .typing::after {
+        content: "▍";
+        animation: pulse 1s infinite;
+        font-weight: bold;
+      }
+      .fade-in {
+        animation: fadeIn 0.25s ease-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .stage-dot {
+        transition: all 0.25s ease-out;
+      }
+      .stage-dot.active {
+        background: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+      }
+      .stage-dot.done {
+        background: #10b981;
+      }
+      .song-card {
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .song-card:hover {
+        border-color: #3b82f6;
+        background: rgba(30, 41, 59, 0.6);
+      }
+      ::-webkit-scrollbar {
+        width: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 2px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+      }
+      .mono {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen text-slate-100 font-sans"
+  >
+    <!-- Header -->
+    <header
+      class="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-50"
+    >
+      <div
+        class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center border border-blue-500/30"
+          >
+            <i class="fas fa-wave-square text-white text-sm"></i>
+          </div>
+          <h1 class="text-lg font-semibold tracking-tight">
+            <span class="text-blue-400">EchoPulse</span
+            ><span class="text-slate-400">AI</span>
+          </h1>
+        </div>
+        <span
+          id="status"
+          class="text-xs text-emerald-400 flex items-center gap-1.5 font-mono"
+        >
+          <span
+            class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
+          ></span>
+          ONLINE
+        </span>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="max-w-6xl mx-auto px-4 py-5">
+      <!-- Panel de Métricas (colapsable) -->
+      <div class="mb-4">
+        <button
+          onclick="toggleMetrics()"
+          class="text-xs text-slate-500 hover:text-slate-300 font-mono flex items-center gap-1"
+        >
+          <i class="fas fa-chart-bar"></i>
+          <span id="metrics-toggle">Mostrar métricas</span>
+        </button>
+        <div
+          id="metrics-panel"
+          class="hidden mt-2 p-3 bg-slate-800/40 rounded border border-slate-700/40 text-xs font-mono"
+        >
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>
+              <span class="text-slate-500">Consultas:</span
+              ><span id="metric-total" class="text-slate-200 ml-1">-</span>
+            </div>
+            <div>
+              <span class="text-slate-500">Éxito:</span
+              ><span id="metric-success" class="text-emerald-400 ml-1">-</span>
+            </div>
+            <div>
+              <span class="text-slate-500">Latencia:</span
+              ><span id="metric-latency" class="text-cyan-400 ml-1">-</span>
+            </div>
+            <div>
+              <span class="text-slate-500">Meta:</span
+              ><span id="metric-coverage" class="text-blue-400 ml-1">-</span>
+            </div>
+          </div>
+          <button
+            onclick="refreshMetrics()"
+            class="mt-2 px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 rounded text-[10px] text-blue-300 border border-blue-500/25"
+          >
+            🔄 Actualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Pipeline Visual -->
+      <div
+        class="mb-5 p-3.5 bg-slate-800/40 rounded-lg border border-slate-700/50"
+      >
+        <div class="flex items-center justify-between mb-2.5">
+          <span
+            class="text-xs font-medium text-slate-300 uppercase tracking-wider"
+            >Pipeline</span
+          >
+          <span
+            id="pipeline-status"
+            class="text-[10px] text-slate-500 font-mono"
+            >IDLE</span
+          >
+        </div>
+        <div class="flex items-center justify-between relative">
+          <div
+            class="absolute top-1/2 left-0 right-0 h-px bg-slate-700 -z-10"
+          ></div>
+          <div class="flex flex-col items-center gap-1.5 stage-dot" id="s1">
+            <div
+              class="w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-bold border border-slate-600"
+            >
+              1
+            </div>
+            <span class="text-[10px] text-slate-500 uppercase">Intent</span>
+          </div>
+          <div class="flex flex-col items-center gap-1.5 stage-dot" id="s2">
+            <div
+              class="w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-bold border border-slate-600"
+            >
+              2
+            </div>
+            <span class="text-[10px] text-slate-500 uppercase"
+              >Retrieval (M2)</span
+            >
+          </div>
+          <div class="flex flex-col items-center gap-1.5 stage-dot" id="s3">
+            <div
+              class="w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-bold border border-slate-600"
+            >
+              3
+            </div>
+            <span class="text-[10px] text-slate-500 uppercase"
+              >Re-rank (M3)</span
+            >
+          </div>
+          <div class="flex flex-col items-center gap-1.5 stage-dot" id="s4">
+            <div
+              class="w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-bold border border-slate-600"
+            >
+              4
+            </div>
+            <span class="text-[10px] text-slate-500 uppercase">Output</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div
+        id="chat"
+        class="space-y-3.5 mb-5 min-h-[380px] max-h-[58vh] overflow-y-auto pr-1.5"
+      >
+        <!-- Welcome Message -->
+        <div class="flex gap-2.5 fade-in">
+          <div
+            class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex-shrink-0 flex items-center justify-center border border-blue-500/30"
+          >
+            <i class="fas fa-microchip text-white text-xs"></i>
+          </div>
+          <div
+            class="bg-slate-800/50 rounded-lg rounded-tl-none p-3.5 max-w-[85%] border border-slate-700/50"
+          >
+            <p class="text-slate-200 text-sm">
+              <strong class="text-blue-400">EchoPulse AI</strong> online.
+              Ingresa tu consulta musical.
+            </p>
+            <p class="text-slate-500 mt-1.5 text-xs">
+              Arquitectura corregida: Módulo 2 (Retrieval) → Módulo 3
+              (Re-ranking semántico).
+            </p>
+            <div class="flex flex-wrap gap-1.5 mt-2.5">
+              <button
+                onclick="quick('Necesito música para concentrarme')"
+                class="px-2.5 py-1 bg-blue-500/15 hover:bg-blue-500/25 rounded text-[10px] transition border border-blue-500/25 text-blue-300"
+              >
+                🎯 Focus
+              </button>
+              <button
+                onclick="quick('Música intensa para entrenar')"
+                class="px-2.5 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 rounded text-[10px] transition border border-cyan-500/25 text-cyan-300"
+              >
+                💪 Workout
+              </button>
+              <button
+                onclick="quick('Recomiéndame rock clásico')"
+                class="px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 rounded text-[10px] transition border border-amber-500/25 text-amber-300"
+              >
+                🎸 Rock
+              </button>
+              <button
+                onclick="quick('Música relajante para dormir')"
+                class="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 rounded text-[10px] transition border border-emerald-500/25 text-emerald-300"
+              >
+                😴 Relax
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div
+        class="sticky bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-3.5 pb-2 z-40"
+      >
+        <form id="form" class="flex gap-2.5">
+          <input
+            type="text"
+            id="input"
+            class="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition placeholder-slate-500 font-mono"
+            placeholder="> Ingresa tu consulta musical..."
+            autocomplete="off"
+          />
+          <button
+            type="submit"
+            id="send"
+            class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg text-sm font-medium hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 border border-blue-500/30"
+          >
+            <i class="fas fa-paper-plane text-xs"></i>
+            <span>Enviar</span>
+          </button>
+        </form>
+        <p class="text-[10px] text-slate-600 text-center mt-1.5 font-mono">
+          ENTER para enviar • Enlaces abren en nueva pestaña
+        </p>
+      </div>
+    </main>
+
+    <!-- Modal de Resultados -->
+    <div
+      id="modal"
+      class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-slate-900 rounded-lg p-4 max-w-2xl w-full border border-slate-700/50 max-h-[88vh] overflow-y-auto"
+      >
+        <div
+          class="flex justify-between items-start mb-3 pb-2.5 border-b border-slate-700/50"
+        >
+          <h3 class="text-base font-semibold text-slate-200">
+            ⚡ Resultados del Pipeline
+          </h3>
+          <button
+            onclick="closeModal()"
+            class="text-slate-500 hover:text-slate-300 text-lg transition"
+          >
+            &times;
+          </button>
+        </div>
+        <div id="modal-content" class="space-y-3"></div>
+        <div class="mt-3 pt-3 border-t border-slate-700/50">
+          <p class="text-[10px] text-slate-500 text-center font-mono">
+            💡 Flujo corregido: M2 (Retrieval Tabla Maestra) → M3 (Re-ranking
+            Intención) • Enlaces Spotify directos por ID
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div
+      id="toast"
+      class="fixed bottom-16 right-4 bg-slate-800/90 border border-slate-700/50 rounded-lg px-3.5 py-2.5 text-xs text-slate-200 shadow-lg transform translate-x-full transition-transform duration-250 z-50 font-mono"
+    >
+      <span id="toast-message"></span>
+    </div>
+
+    <script>
+      const chat = document.getElementById("chat");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const send = document.getElementById("send");
+      const pipelineStatus = document.getElementById("pipeline-status");
+      const statusEl = document.getElementById("status");
+      let loading = false,
+        metricsInterval = null;
+
+      function showToast(message, type = "info") {
+        const toast = document.getElementById("toast");
+        document.getElementById("toast-message").textContent = message;
+        toast.className = `fixed bottom-16 right-4 border rounded-lg px-3.5 py-2.5 text-xs shadow-lg transition-transform duration-250 z-50 font-mono ${
+          type === "error"
+            ? "bg-red-900/80 border-red-700/50 text-red-200"
+            : type === "success"
+              ? "bg-emerald-900/80 border-emerald-700/50 text-emerald-200"
+              : "bg-slate-800/90 border-slate-700/50 text-slate-200"
+        }`;
+        toast.classList.remove("translate-x-full");
+        setTimeout(() => toast.classList.add("translate-x-full"), 2500);
+      }
+
+      function quick(text) {
+        input.value = text;
+        form.requestSubmit();
+        input.focus();
+      }
+      function formatScore(score) {
+        if (score == null) return "N/A";
+        const num = parseFloat(score);
+        if (isNaN(num)) return "N/A";
+        return num >= 0 ? `+${num.toFixed(4)}` : num.toFixed(4);
+      }
+
+      function toggleMetrics() {
+        const panel = document.getElementById("metrics-panel");
+        const toggle = document.getElementById("metrics-toggle");
+        panel.classList.toggle("hidden");
+        toggle.textContent = panel.classList.contains("hidden")
+          ? "Mostrar métricas"
+          : "Ocultar métricas";
+        if (!panel.classList.contains("hidden")) refreshMetrics();
+      }
+
+      async function refreshMetrics() {
+        try {
+          const res = await fetch("/api/metrics");
+          const data = await res.json();
+          document.getElementById("metric-total").textContent =
+            data.total_queries || 0;
+          document.getElementById("metric-success").textContent =
+            `${(data.success_rate || 0).toFixed(1)}%`;
+          document.getElementById("metric-latency").textContent =
+            data.avg_latency_ms > 0
+              ? `${data.avg_latency_ms.toFixed(0)}ms`
+              : "-";
+          document.getElementById("metric-coverage").textContent =
+            `${(data.metadata_coverage || 0).toFixed(1)}%`;
+        } catch (e) {
+          console.warn("No se pudieron cargar métricas:", e);
+        }
+      }
+
+      function setupMetricsAutoRefresh() {
+        if (metricsInterval) clearInterval(metricsInterval);
+        metricsInterval = setInterval(() => {
+          const panel = document.getElementById("metrics-panel");
+          if (panel && !panel.classList.contains("hidden")) refreshMetrics();
+        }, 30000);
+      }
+
+      function addMessage(text, isUser = false, metadata = null) {
+        const div = document.createElement("div");
+        div.className = `flex gap-2.5 fade-in ${isUser ? "flex-row-reverse" : ""}`;
+        const avatar = isUser
+          ? `<div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-600 to-cyan-500 flex items-center justify-center border border-emerald-500/30"><i class="fas fa-user text-white text-xs"></i></div>`
+          : `<div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center border border-blue-500/30"><i class="fas fa-microchip text-white text-xs"></i></div>`;
+        const bg = isUser
+          ? "bg-emerald-500/10 border-emerald-700/30 rounded-tr-none"
+          : "bg-slate-800/50 border-slate-700/50 rounded-tl-none";
+
+        let extra = "";
+        // ✅ CAMBIO CLAVE: Usar nombres corregidos del backend
+        if (
+          metadata?.module2_retrieval?.length ||
+          metadata?.module3_reranked?.length
+        ) {
+          extra = `<button onclick="showResults(${JSON.stringify(metadata).replace(/"/g, "&quot;")})" class="mt-2.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 rounded text-[10px] transition text-blue-300 font-mono">[VIEW_TOP_10]</button>`;
+        }
+        // Las recomendaciones finales siempre vienen del re-ranker (Módulo 3)
+        if (metadata?.module3_reranked?.length) {
+          const top3 = metadata.module3_reranked.slice(0, 3);
+          const cards = top3
+            .map((song) => {
+              const name =
+                song.track_name && song.track_name !== "Unknown"
+                  ? song.track_name
+                  : song.id
+                    ? song.id.slice(0, 12) + "..."
+                    : "Unknown";
+              const artist =
+                song.artist_name && song.artist_name !== "Unknown"
+                  ? song.artist_name
+                  : "";
+              return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/40 rounded border border-slate-700/40">
+              <div class="flex-1 min-w-0 pr-2">
+                <span class="text-xs font-medium text-slate-200 truncate block">${name}</span>
+                ${artist ? `<span class="text-[10px] text-slate-500">• ${artist}</span>` : ""}
+              </div>
+              <div class="flex gap-1 flex-shrink-0">
+                ${song.spotify_url ? `<a href="${song.spotify_url}" target="_blank" class="p-1.5 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Spotify"><i class="fab fa-spotify text-[10px]"></i></a>` : ""}
+                ${song.youtube_url ? `<a href="${song.youtube_url}" target="_blank" class="p-1.5 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="YouTube"><i class="fab fa-youtube text-[10px]"></i></a>` : ""}
+              </div>
+            </div>`;
+            })
+            .join("");
+          extra += `<div class="mt-2.5 pt-2.5 border-t border-slate-700/40"><p class="text-[10px] text-slate-500 mb-1.5 font-mono">[RECOMMENDATIONS]</p><div class="space-y-1.5">${cards}</div></div>`;
+        }
+        div.innerHTML = `${avatar}<div class="${bg} rounded-lg p-3.5 max-w-[85%] border"><p class="text-slate-200 text-sm leading-relaxed">${text}</p>${extra}</div>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      function setLoading(state) {
+        loading = state;
+        send.disabled = state;
+        input.disabled = state;
+        if (state) {
+          send.innerHTML = `<i class="fas fa-spinner fa-spin text-xs"></i>`;
+          const typing = document.createElement("div");
+          typing.id = "typing-indicator";
+          typing.className = "flex gap-2.5 fade-in";
+          typing.innerHTML = `<div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center border border-blue-500/30"><i class="fas fa-microchip text-white text-xs"></i></div>
+            <div class="bg-slate-800/50 rounded-lg rounded-tl-none p-3.5 border border-slate-700/50">
+              <p class="text-slate-400 typing text-sm font-mono">PROCESSING_QUERY...</p>
+              <p class="text-[10px] text-slate-600 mt-0.5 font-mono">intent → M2(retrieval) → M3(rerank) → generate</p>
+            </div>`;
+          chat.appendChild(typing);
+          chat.scrollTop = chat.scrollHeight;
+        } else {
+          send.innerHTML = `<i class="fas fa-paper-plane text-xs"></i><span class="ml-1">Enviar</span>`;
+          document.getElementById("typing-indicator")?.remove();
+        }
+      }
+
+      function updatePipeline(stages) {
+        if (!stages) return;
+        ["s1", "s2", "s3", "s4"].forEach((id, i) => {
+          const el = document.getElementById(id);
+          if (stages[i]) {
+            el.classList.add("active");
+            setTimeout(() => {
+              el.classList.remove("active");
+              el.classList.add("done");
+            }, 400);
+          }
+        });
+        pipelineStatus.textContent = "RUNNING...";
+      }
+      function resetPipeline() {
+        document.querySelectorAll(".stage-dot").forEach((el) => {
+          el.classList.remove("active", "done");
+          el.querySelector("div").className =
+            "w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-bold border border-slate-600";
+        });
+        pipelineStatus.textContent = "IDLE";
+      }
+
+      function showResults(metadata) {
+        const modal = document.getElementById("modal"),
+          content = document.getElementById("modal-content");
+        const renderList = (items, title, color, icon) => {
+          if (!items || items.length === 0)
+            return `<div class="p-3 bg-slate-800/40 rounded border border-slate-700/40 text-slate-500 text-center text-xs font-mono">${title}: NO_RESULTS</div>`;
+          const cc =
+            {
+              blue: "text-blue-400 bg-blue-500/15 border-blue-500/25",
+              emerald:
+                "text-emerald-400 bg-emerald-500/15 border-emerald-500/25",
+              cyan: "text-cyan-400 bg-cyan-500/15 border-cyan-500/25",
+              amber: "text-amber-400 bg-amber-500/15 border-amber-500/25",
+            }[color] || "text-blue-400 bg-blue-500/15 border-blue-500/25";
+          return `<div class="p-3 bg-slate-800/40 rounded border border-slate-700/40">
+            <h4 class="font-medium ${cc.split(" ")[0]} mb-2.5 flex items-center gap-1.5 text-xs font-mono"><i class="${icon}"></i> ${title}</h4>
+            <div class="space-y-1.5">${items
+              .map((item, i) => {
+                const hasName =
+                    item.track_name && item.track_name !== "Unknown",
+                  hasArtist =
+                    item.artist_name && item.artist_name !== "Unknown";
+                const displayName = hasName
+                  ? item.track_name
+                  : item.id
+                    ? item.id.slice(0, 12) + "..."
+                    : "Unknown";
+                const displayArtist = hasArtist ? item.artist_name : "",
+                  songId = item.id ? item.id.slice(0, 12) + "..." : "N/A";
+                const score =
+                  item.final_score !== undefined
+                    ? item.final_score
+                    : item.similarity !== undefined
+                      ? item.similarity
+                      : 0;
+                return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/30 rounded border border-slate-700/30">
+                <div class="flex-1 min-w-0 pr-2">
+                  <span class="text-[10px] font-bold ${cc.split(" ")[0]} mr-1.5 font-mono">#${i + 1}</span>
+                  <span class="text-xs font-medium text-slate-200 truncate block">${displayName}</span>
+                  ${displayArtist ? `<span class="text-[10px] text-slate-500 block mt-0.5">• ${displayArtist}</span>` : ""}
+                  <span class="text-[9px] text-slate-600 block mt-0.5 font-mono">ID:${songId}</span>
+                </div>
+                <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                  <span class="text-[10px] px-1.5 py-0.5 ${cc.split(" ")[1]} rounded font-mono">${formatScore(score)}</span>
+                  <div class="flex gap-1">${item.spotify_url ? `<a href="${item.spotify_url}" target="_blank" class="p-1 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Spotify"><i class="fab fa-spotify text-[9px]"></i></a>` : ""}
+                  ${item.youtube_url ? `<a href="${item.youtube_url}" target="_blank" class="p-1 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="YouTube"><i class="fab fa-youtube text-[9px]"></i></a>` : ""}</div>
+                </div>
+              </div>`;
+              })
+              .join("")}</div></div>`;
+        };
+        // ✅ ORDEN CORREGIDO: Primero Retrieval (M2), luego Re-ranking (M3)
+        content.innerHTML = `${renderList(metadata.module2_retrieval, "MODULE_2 :: MST_MR_RETRIEVAL", "blue", "fas fa-database")}${renderList(metadata.module3_reranked, "MODULE_3 :: INTENT_RERANK", "emerald", "fas fa-brain")}`;
+        modal.classList.remove("hidden");
+        showToast("RESULTS_LOADED", "success");
+      }
+      function closeModal() {
+        document.getElementById("modal").classList.add("hidden");
+      }
+      document.getElementById("modal").addEventListener("click", (e) => {
+        if (e.target.id === "modal") closeModal();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal();
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = input.value.trim();
+        if (!msg || loading) return;
+        addMessage(msg, true);
+        input.value = "";
+        setLoading(true);
+        resetPipeline();
+        input.focus();
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            addMessage(`❌ ${data.error}`, false);
+            showToast("ERROR", "error");
+          } else {
+            if (data.stages) updatePipeline(data.stages);
+            pipelineStatus.textContent = "COMPLETE";
+            // ✅ PASAR CLAVES CORREGIDAS
+            addMessage(data.response, false, {
+              module2_retrieval: data.module2_retrieval,
+              module3_reranked: data.module3_reranked,
+            });
+            showToast("RESPONSE_READY", "success");
+          }
+        } catch (err) {
+          console.error("Error:", err);
+          addMessage("❌ Connection error. Check Flask server.", false);
+          showToast("CONNECTION_ERROR", "error");
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      async function checkHealth() {
+        try {
+          const res = await fetch("/api/health", { cache: "no-store" });
+          const data = await res.json();
+          if (data.status === "ok") {
+            statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${data.modules.hf_api.toUpperCase()}`;
+            showToast("SYSTEM_ONLINE", "success");
+          }
+        } catch (e) {
+          statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> OFFLINE`;
+          showToast("CONNECTION_FAILED", "error");
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        checkHealth();
+        input.focus();
+        setupMetricsAutoRefresh();
+      });
+      chat.addEventListener("click", () => {
+        if (!loading) input.focus();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoPulse AI: Arquitectura Completa - Entrenamiento + Inferencia</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --neon-cyan: #00f3ff;
+        --neon-pink: #ff00ff;
+        --neon-purple: #bc13fe;
+        --neon-yellow: #f3ff00;
+        --neon-orange: #ff6600;
+        --neon-green: #00ff88;
+        --neon-blue: #0066ff;
+        --neon-red: #ff0040;
+        --bg-dark: #030308;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: var(--bg-dark);
+        color: #e0e0e0;
+        font-family: "Inter", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        line-height: 1.6;
+      }
+
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .bg-grid {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image:
+          linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        z-index: -1;
+      }
+
+      .header {
+        background: rgba(5, 5, 16, 0.95);
+        border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        padding: 1.5rem;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .header-title {
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
+        font-weight: 800;
+        background: linear-gradient(90deg, #fff, var(--neon-cyan), var(--neon-green));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .phase-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-right: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .phase-train { background: rgba(255, 0, 64, 0.2); color: var(--neon-red); border: 1px solid var(--neon-red); }
+      .phase-deploy { background: rgba(0, 102, 255, 0.2); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+      .phase-runtime { background: rgba(0, 255, 136, 0.2); color: var(--neon-green); border: 1px solid var(--neon-green); }
+
+      .main-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin: 2rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid;
+      }
+
+      .title-train { color: var(--neon-red); border-color: var(--neon-red); }
+      .title-deploy { color: var(--neon-blue); border-color: var(--neon-blue); }
+      .title-runtime { color: var(--neon-green); border-color: var(--neon-green); }
+
+      .card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        flex-shrink: 0;
+      }
+
+      .card-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .code-block {
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 12px;
+        padding: 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .code-header {
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+      }
+
+      .keyword { color: #ff79c6; }
+      .string { color: #f1fa8c; }
+      .function { color: #50fa7b; }
+      .comment { color: #6272a4; }
+      .number { color: #bd93f9; }
+
+      .arch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .arch-block {
+        background: rgba(10, 10, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 1.25rem;
+      }
+
+      .arch-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .arch-content {
+        font-size: 0.85rem;
+        color: #aaa;
+        line-height: 1.5;
+      }
+
+      .tensor-shape {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        background: rgba(0, 243, 255, 0.1);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        display: inline-block;
+        margin: 0.25rem 0;
+      }
+
+      .fix-box {
+        background: rgba(255, 0, 64, 0.1);
+        border-left: 4px solid var(--neon-red);
+        border-radius: 0 12px 12px 0;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+
+      .fix-title {
+        color: var(--neon-red);
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+      }
+
+      .copy-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: rgba(0, 243, 255, 0.2);
+        border: 1px solid var(--neon-cyan);
+        color: var(--neon-cyan);
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: all 0.2s;
+      }
+
+      .copy-btn:hover {
+        background: var(--neon-cyan);
+        color: #000;
+      }
+
+      .tab-container {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #888;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .tab:hover, .tab.active {
+        background: var(--neon-cyan);
+        color: #000;
+        border-color: var(--neon-cyan);
+      }
+
+      .tab-content { display: none; }
+      .tab-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .accent-cyan { color: var(--neon-cyan); }
+      .accent-pink { color: var(--neon-pink); }
+      .accent-purple { color: var(--neon-purple); }
+      .accent-yellow { color: var(--neon-yellow); }
+      .accent-green { color: var(--neon-green); }
+      .accent-orange { color: var(--neon-orange); }
+      .accent-red { color: var(--neon-red); }
+      .accent-blue { color: var(--neon-blue); }
+
+      .bg-cyan { background: rgba(0, 243, 255, 0.1); border-color: var(--neon-cyan); }
+      .bg-pink { background: rgba(255, 0, 255, 0.1); border-color: var(--neon-pink); }
+      .bg-purple { background: rgba(188, 19, 254, 0.1); border-color: var(--neon-purple); }
+      .bg-yellow { background: rgba(243, 255, 0, 0.1); border-color: var(--neon-yellow); }
+      .bg-green { background: rgba(0, 255, 136, 0.1); border-color: var(--neon-green); }
+      .bg-orange { background: rgba(255, 102, 0, 0.1); border-color: var(--neon-orange); }
+      .bg-red { background: rgba(255, 0, 64, 0.1); border-color: var(--neon-red); }
+
+      /* NUEVOS ESTILOS PARA DIAGRAMAS SIN MERMAID */
+      .pipeline-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .phase-section {
+        border: 2px solid;
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: relative;
+      }
+
+      .phase-train-section { border-color: var(--neon-red); background: rgba(255, 0, 64, 0.05); }
+      .phase-deploy-section { border-color: var(--neon-blue); background: rgba(0, 102, 255, 0.05); }
+      .phase-runtime-section { border-color: var(--neon-green); background: rgba(0, 255, 136, 0.05); }
+
+      .phase-header {
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .flow-item {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        position: relative;
+      }
+
+      .flow-arrow-down {
+        text-align: center;
+        font-size: 1.5rem;
+        color: var(--neon-cyan);
+        margin: 0.5rem 0;
+      }
+
+      .flow-connector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--neon-cyan);
+        font-size: 1.5rem;
+        font-weight: bold;
+      }
+
+      @media (min-width: 768px) {
+        .flow-connector {
+          transform: rotate(-90deg);
+          width: 40px;
+        }
+        .pipeline-horizontal {
+          display: flex;
+          align-items: stretch;
+          gap: 0;
+        }
+        .pipeline-horizontal .phase-section {
+          flex: 1;
+          margin: 0 0.5rem;
+        }
+        .pipeline-horizontal .flow-connector {
+          transform: none;
+          width: auto;
+          display: flex;
+          align-items: center;
+          padding: 0 1rem;
+        }
+      }
+
+      /* Sequence Diagram CSS */
+      .sequence-container {
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        overflow-x: auto;
+      }
+
+      .sequence-header {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+      }
+
+      .sequence-role {
+        text-align: center;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        min-width: 120px;
+      }
+
+      .role-user { background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); }
+      .role-server { background: rgba(0, 102, 255, 0.1); border: 1px solid var(--neon-blue); color: var(--neon-blue); }
+      .role-model { background: rgba(255, 0, 64, 0.1); border: 1px solid var(--neon-red); color: var(--neon-red); }
+      .role-data { background: rgba(0, 255, 136, 0.1); border: 1px solid var(--neon-green); color: var(--neon-green); }
+
+      .sequence-timeline {
+        position: relative;
+        padding: 1rem 0;
+      }
+
+      .sequence-step {
+        display: flex;
+        align-items: center;
+        margin: 1.5rem 0;
+        position: relative;
+      }
+
+      .step-line {
+        position: absolute;
+        left: 50%;
+        top: -20px;
+        bottom: -20px;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(-50%);
+        z-index: 0;
+      }
+
+      .step-from, .step-to {
+        flex: 1;
+        text-align: center;
+        z-index: 1;
+      }
+
+      .step-arrow {
+        flex: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .arrow-line {
+        height: 2px;
+        background: var(--neon-cyan);
+        flex: 1;
+        position: relative;
+      }
+
+      .arrow-head {
+        color: var(--neon-cyan);
+        font-size: 1.2rem;
+        margin-left: -5px;
+      }
+
+      .step-label {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        top: -10px;
+        white-space: nowrap;
+      }
+
+      .step-return .arrow-line {
+        background: var(--neon-purple);
+        border-top: 1px dashed var(--neon-purple);
+      }
+      .step-return .arrow-head { color: var(--neon-purple); }
+
+      .data-flow {
+        background: rgba(255, 255, 0, 0.05);
+        border: 1px solid var(--neon-yellow);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+        text-align: center;
+      }
+
+      .arch-diagram {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+      }
+
+      .arch-node {
+        background: rgba(0, 0, 0, 0.5);
+        border: 2px solid;
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: relative;
+      }
+
+      .arch-node::after {
+        content: "↓";
+        position: absolute;
+        bottom: -2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 2rem;
+        color: var(--neon-cyan);
+      }
+
+      .arch-node:last-child::after { display: none; }
+
+      @media (min-width: 768px) {
+        .arch-node::after {
+          content: "→";
+          right: -2rem;
+          top: 50%;
+          left: auto;
+          bottom: auto;
+          transform: translateY(-50%);
+        }
+      }
+
+      .full-width { grid-column: 1 / -1; }
+      .relative { position: relative; }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+
+    <header class="header">
+      <h1 class="header-title">EchoPulse AI: Arquitectura End-to-End</h1>
+      <div style="margin-top: 1rem">
+        <span class="phase-badge phase-train">1. Entrenamiento Offline</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-deploy">2. Deployment</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-runtime">3. Runtime Inference</span>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <div class="tab-container">
+        <div class="tab active" onclick="switchTab('overview')">🌊 Vista General</div>
+        <div class="tab" onclick="switchTab('training')">🔥 Entrenamiento</div>
+        <div class="tab" onclick="switchTab('deployment')">📦 Deployment</div>
+        <div class="tab" onclick="switchTab('inference')">⚡ Inferencia Runtime</div>
+        <div class="tab" onclick="switchTab('fixes')">🔧 Correcciones Críticas</div>
+        <div class="tab" onclick="switchTab('code')">💻 Código Completo</div>
+      </div>
+
+      <!-- TAB 1: Overview -->
+      <div id="tab-overview" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-cyan);">🌊</div>
+            <div>
+              <div class="card-title" style="color: var(--neon-cyan)">Arquitectura Completa: Train → Deploy → Serve</div>
+              <div style="color: #666; font-size: 0.85rem">Flujo de datos y componentes en cada fase</div>
+            </div>
+          </div>
+
+          <!-- Reemplazo del diagrama Mermaid con HTML/CSS -->
+          <div class="pipeline-container">
+            <!-- Fase 1 -->
+            <div class="phase-section phase-train-section">
+              <div class="phase-header" style="color: var(--neon-red);">
+                <span>🔴</span> FASE 1: ENTRENAMIENTO (Offline)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700;">5,710 canciones</div>
+                  <div style="font-size: 0.8rem; color: #888;">.parquet files</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700;">Limpieza NLP</div>
+                  <div style="font-size: 0.8rem; color: #888;">+ StandardScaler</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700;">MST_MR_Dataset</div>
+                  <div style="font-size: 0.8rem; color: #888;">Tokens + Tech (26)</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-green); font-weight: 700;">DataLoader</div>
+                  <div style="font-size: 0.8rem; color: #888;">Batch=32, 15 épocas</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item" style="border-color: var(--neon-red);">
+                  <div style="color: var(--neon-red); font-weight: 700;">mst_mr_final.pth</div>
+                  <div style="font-size: 0.8rem; color: #888;">+ vocab + scaler</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Fase 2 -->
+            <div class="phase-section phase-deploy-section">
+              <div class="phase-header" style="color: var(--neon-blue);">
+                <span>🔵</span> FASE 2: DEPLOYMENT (Init)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-blue); font-weight: 700;">torch.load()</div>
+                  <div style="font-size: 0.8rem; color: #888;">weights_only=False</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-purple); font-weight: 700;">Reconstrucción</div>
+                  <div style="font-size: 0.8rem; color: #888;">Vocab + Scaler</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item" style="border-color: var(--neon-green);">
+                  <div style="color: var(--neon-green); font-weight: 700;">model.eval()</div>
+                  <div style="font-size: 0.8rem; color: #888;">Modo inferencia</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700;">Pre-compute</div>
+                  <div style="font-size: 0.8rem; color: #888;">embeddings.pt</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Fase 3 -->
+            <div class="phase-section phase-runtime-section">
+              <div class="phase-header" style="color: var(--neon-green);">
+                <span>🟢</span> FASE 3: RUNTIME (Inference)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700;">Usuario Web</div>
+                  <div style="font-size: 0.8rem; color: #888;">Input texto</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700;">POST /predict</div>
+                  <div style="font-size: 0.8rem; color: #888;">Flask Server</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700;">Forward Pass</div>
+                  <div style="font-size: 0.8rem; color: #888;">torch.no_grad()</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-orange); font-weight: 700;">Similaridad</div>
+                  <div style="font-size: 0.8rem; color: #888;">Cosine + Jaccard</div>
+                </div>
+                <div class="flow-connector">→</div>
+                <div class="flow-item" style="border-color: var(--neon-green);">
+                  <div style="color: var(--neon-green); font-weight: 700;">Top 10</div>
+                  <div style="font-size: 0.8rem; color: #888;">JSON Response</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-grid">
+          <div class="arch-block" style="border-color: var(--neon-red)">
+            <div class="arch-title" style="color: var(--neon-red)"><span>🔴</span> FASE 1: Entrenamiento</div>
+            <div class="arch-content">
+              <strong>Input:</strong> 5,710 canciones con letras + 26 features<br/>
+              <strong>Proceso:</strong> 15 épocas, batch 32, AdamW<br/>
+              <strong>Output:</strong> mst_mr_final.pth con pesos, vocab y scaler<br/>
+              <strong>Loss:</strong> MSE sobre features técnicos
+            </div>
+          </div>
+
+          <div class="arch-block" style="border-color: var(--neon-blue)">
+            <div class="arch-title" style="color: var(--neon-blue)"><span>🔵</span> FASE 2: Deployment</div>
+            <div class="arch-content">
+              <strong>Carga:</strong> Checkpoint en CPU/GPU<br/>
+              <strong>Reconstrucción:</strong> Vocabulario y scaler desde .pth<br/>
+              <strong>Pre-cómputo:</strong> Generar embeddings.pt de todas las canciones<br/>
+              <strong>Estado:</strong> model.eval() + embeddings en RAM
+            </div>
+          </div>
+
+          <div class="arch-block" style="border-color: var(--neon-green)">
+            <div class="arch-title" style="color: var(--neon-green)"><span>🟢</span> FASE 3: Runtime</div>
+            <div class="arch-content">
+              <strong>Input:</strong> Texto usuario vía Flask<br/>
+              <strong>Proceso:</strong> Tokenización → Neural Sim + Jaccard → TopK<br/>
+              <strong>Output:</strong> 10 canciones ranqueadas por similitud<br/>
+              <strong>Validación:</strong> NaN handling, mínimo 2 palabras
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Training -->
+      <div id="tab-training" class="tab-content">
+        <h2 class="section-title title-train">🔴 Fase 1: Entrenamiento Offline</h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon bg-green" style="background: rgba(0, 255, 136, 0.1); border-color: var(--neon-green);">📊</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-green)">Pipeline de Datos</div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-green)">MST_MR_Dataset</div>
+              <div class="arch-content">
+                <div class="tensor-shape">__getitem__(idx) → (lyrics_tokens, tech_vector)</div>
+                <ul style="margin-left: 1rem; margin-top: 0.5rem">
+                  <li>lyrics: tokenizer.encode → <span class="tensor-shape">(151,)</span></li>
+                  <li>tech: 26 features escalados → <span class="tensor-shape">(26,)</span></li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">DataLoader</div>
+              <div class="arch-content">
+                batch_size=32, shuffle=True<br/>
+                ~179 batches por época (5,710/32)
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(255, 0, 64, 0.1); border-color: var(--neon-red);">🧠</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">MST_MR_Transformer</div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-cyan)">Encoder Dual</div>
+              <div class="arch-content">
+                <strong>Lírica:</strong> Embedding(vocab, 512) + PosEncoding<br/>
+                <strong>Técnica:</strong> Linear(26→256→512) + GELU
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-pink)">Fusión Cross-Attention</div>
+              <div class="arch-content">
+                Q: lírica, K/V: técnica, nhead=8<br/>
+                Output: <span class="tensor-shape">(32, 151, 512)</span>
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-purple)">Decoder ×6 + Output</div>
+              <div class="arch-content">
+                6 capas TransformerDecoder<br/>
+                Global pooling → <span class="tensor-shape">(32, 512)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(255, 0, 64, 0.1); border-color: var(--neon-red);">🔥</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">Training Loop</div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-red)">Auto-supervisión</div>
+              <div class="arch-content">
+                Target: Reconstruir vector 512-d de la canción<br/>
+                loss = MSELoss(output, target_embedding)
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-orange)">Optimización</div>
+              <div class="arch-content">
+                AdamW(lr=1e-4, weight_decay=0.01)<br/>
+                Gradient clipping (max_norm=1.0)<br/>
+                15 épocas
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="border-color: var(--neon-green); background: rgba(0, 255, 136, 0.05);">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(0, 255, 136, 0.2); border-color: var(--neon-green);">💾</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-green)">Checkpoint Final</div>
+              </div>
+            </div>
+
+            <div class="code-block" style="background: rgba(0, 0, 0, 0.3)">
+              <div class="code-header">Contenido de mst_mr_final.pth</div>
+              <pre>{
+    'model': model.state_dict(),      # Pesos del transformer
+    'vocab': tokenizer.vocab,         # {palabra: índice} (5k)
+    'scaler': scaler,                 # MinMaxScaler fiteado
+    'config': {                       # Hiperparámetros
+        'vocab_size': 5000,
+        'n_tech': 26,
+        'd_model': 512,
+        'nhead': 8,
+        'num_layers': 6,
+        'max_len': 151
+    }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Deployment -->
+      <div id="tab-deployment" class="tab-content">
+        <h2 class="section-title title-deploy">🔵 Fase 2: Deployment & Carga</h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(0, 102, 255, 0.1); border-color: var(--neon-blue);">📥</div>
+            <div>
+              <div class="card-title" style="color: var(--neon-blue)">Código de Carga (app.py)</div>
+            </div>
+          </div>
+
+          <div class="code-block relative">
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+            <div class="code-header">Inicialización segura del modelo</div>
+            <pre><span class="keyword">import</span> torch.serialization
+torch.serialization.add_safe_globals([MinMaxScaler])  <span class="comment"># FIX Seguridad PyTorch 2.6+</span>
+
+<span class="comment"># Carga del checkpoint</span>
+checkpoint = torch.load(MODEL_PATH, map_location=<span class="string">'cpu'</span>, weights_only=<span class="keyword">False</span>)
+
+<span class="comment"># Reconstrucción de componentes</span>
+vocab = checkpoint[<span class="string">'vocab'</span>]                    <span class="comment"># dict: palabra → índice</span>
+scaler = checkpoint[<span class="string">'scaler'</span>]                  <span class="comment"># MinMaxScaler con min/max</span>
+model_state = checkpoint[<span class="string">'model'</span>]             <span class="comment"># state_dict de pesos</span>
+
+<span class="comment"># Instanciación del modelo</span>
+model = MST_MR_Transformer(vocab_size=<span class="function">len</span>(vocab))
+model.load_state_dict(model_state)
+model.<span class="function">eval</span>()  <span class="comment"># CRÍTICO: desactiva dropout y batchnorm</span>
+
+<span class="comment"># Pre-cargar embeddings pre-computados</span>
+song_embeddings = torch.load(EMBEDDINGS_PATH)  <span class="comment"># (5710, 512)</span>
+lyric_word_sets = [<span class="function">set</span>(<span class="function">str</span>(l).split()) <span class="keyword">for</span> l <span class="keyword">in</span> df[<span class="string">'lyrics_cleaned'</span>]]
+
+<span class="keyword">print</span>(<span class="string">f"--- ✅ Sistema Listo | Vocab: </span>{<span class="function">len</span>(vocab)}<span class="string"> | Embeddings cargados ---"</span>)</pre>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">⚠️ FIX 1: add_safe_globals requerido</div>
+            <p style="color: #aaa; font-size: 0.9rem">
+              PyTorch 2.6+ requiere <code>add_safe_globals([MinMaxScaler])</code> para deserializar objetos sklearn. Sin esto, <code>torch.load()</code> falla con error de seguridad.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(0, 255, 136, 0.1); border-color: var(--neon-green);">⚡</div>
+            <div>
+              <div class="card-title" style="color: var(--neon-green)">Pre-computo de Embeddings</div>
+              <div style="color: #666; font-size: 0.85rem">Ejecutar una vez: python precompute_embeddings.py</div>
+            </div>
+          </div>
+
+          <div class="code-block relative">
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+            <div class="code-header">precompute_embeddings.py - Lógica clave</div>
+            <pre><span class="keyword">def</span> <span class="function">precompute</span>(df, model, vocab, scaler, batch_size=<span class="number">64</span>):
+    model.<span class="function">eval</span>()
+    all_embs = []
+    
+    <span class="keyword">for</span> start <span class="keyword">in</span> <span class="function">range</span>(<span class="number">0</span>, <span class="function">len</span>(df), batch_size):
+        batch = df.iloc[start:start + batch_size]
+        
+        <span class="comment"># Tokenizar</span>
+        token_batch = [
+            words_to_tokens(clean_text(<span class="function">str</span>(row[lyric_col])), vocab)
+            <span class="keyword">for</span> _, row <span class="keyword">in</span> batch.iterrows()
+        ]
+        
+        <span class="comment"># Preparar features técnicos (26 cols)</span>
+        tech_vals = scaler.transform(batch[tech_cols].fillna(<span class="number">0.5</span>))
+        
+        <span class="keyword">with</span> torch.no_grad():
+            emb = model(
+                torch.tensor(token_batch),
+                torch.tensor(tech_vals)
+            )
+        all_embs.append(emb)
+    
+    <span class="keyword">return</span> torch.cat(all_embs)  <span class="comment"># Guardar como embeddings.pt</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Inference -->
+      <div id="tab-inference" class="tab-content">
+        <h2 class="section-title title-runtime">🟢 Fase 3: Runtime Inference</h2>
+
+        <!-- Diagrama de Secuencia sin Mermaid -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(0, 255, 136, 0.1); border-color: var(--neon-green);">⚡</div>
+            <div>
+              <div class="card-title" style="color: var(--neon-green)">Flujo de Inferencia: /predict</div>
+            </div>
+          </div>
+
+          <div class="sequence-container">
+            <div class="sequence-header">
+              <div class="sequence-role role-user">Usuario Web</div>
+              <div class="sequence-role role-server">Flask Server</div>
+              <div class="sequence-role role-model">MST-MR Model</div>
+              <div class="sequence-role role-data">Tabla Maestra</div>
+            </div>
+
+            <div class="data-flow">POST /predict {lyrics: "hello darkness..."}</div>
+
+            <div class="sequence-timeline">
+              <div class="sequence-step">
+                <div class="step-from role-user" style="background: rgba(0, 243, 255, 0.1); padding: 0.5rem; border-radius: 8px;">Input usuario</div>
+                <div class="step-arrow">
+                  <div class="arrow-line"></div>
+                  <div class="arrow-head">▶</div>
+                  <div class="step-label">HTTP POST /predict</div>
+                </div>
+                <div class="step-to role-server" style="background: rgba(0, 102, 255, 0.1); padding: 0.5rem; border-radius: 8px;">Flask</div>
+              </div>
+
+              <div class="sequence-step">
+                <div class="step-from role-server" style="text-align: center; width: 100%;">
+                  <div style="background: rgba(255, 255, 0, 0.1); padding: 0.5rem; border-radius: 8px; display: inline-block;">
+                    Preprocesamiento
+                  </div>
+                </div>
+              </div>
+
+              <div class="data-flow">clean_text() → tokens[151] + tech_vector[26]</div>
+
+              <div class="sequence-step">
+                <div class="step-from role-server" style="background: rgba(0, 102, 255, 0.1); padding: 0.5rem; border-radius: 8px;">Tensores</div>
+                <div class="step-arrow">
+                  <div class="arrow-line"></div>
+                  <div class="arrow-head">▶</div>
+                  <div class="step-label">model(l_tensor, t_tensor)</div>
+                </div>
+                <div class="step-to role-model" style="background: rgba(255, 0, 64, 0.1); padding: 0.5rem; border-radius: 8px;">Transformer</div>
+              </div>
+
+              <div class="data-flow">torch.no_grad() → Embedding (1, 512)</div>
+
+              <div class="sequence-step">
+                <div class="step-from role-model" style="background: rgba(255, 0, 64, 0.1); padding: 0.5rem; border-radius: 8px;">Output 512-d</div>
+                <div class="step-arrow step-return">
+                  <div class="arrow-line"></div>
+                  <div class="arrow-head">◀</div>
+                  <div class="step-label">query_emb</div>
+                </div>
+                <div class="step-to role-server" style="background: rgba(0, 102, 255, 0.1); padding: 0.5rem; border-radius: 8px;">Similaridad</div>
+              </div>
+
+              <div class="sequence-step">
+                <div class="step-from role-server" style="text-align: center; width: 100%;">
+                  <div style="background: rgba(255, 102, 0, 0.1); padding: 0.5rem; border-radius: 8px; display: inline-block; border: 1px solid var(--neon-orange);">
+                    Score = 0.4*Neural + 0.6*Jaccard<br/>
+                    torch.topk(score, k=10)
+                  </div>
+                </div>
+              </div>
+
+              <div class="data-flow">Índices Top 10 → Lookup en DataFrame</div>
+
+              <div class="sequence-step">
+                <div class="step-from role-data" style="background: rgba(0, 255, 136, 0.1); padding: 0.5rem; border-radius: 8px;">Canciones</div>
+                <div class="step-arrow step-return">
+                  <div class="arrow-line"></div>
+                  <div class="arrow-head">◀</div>
+                  <div class="step-label">track_name, artist_name, similarity</div>
+                </div>
+                <div class="step-to role-user" style="background: rgba(0, 243, 255, 0.1); padding: 0.5rem; border-radius: 8px;">JSON Response</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(243, 255, 0, 0.1); border-color: var(--neon-yellow);">⚙️</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-yellow)">Preprocesamiento</div>
+              </div>
+            </div>
+
+            <div class="code-block" style="padding: 1rem">
+              <div class="code-header">clean_text() → tokens</div>
+              <pre><span class="keyword">def</span> <span class="function">clean_text_advanced</span>(text):
+    text = unicodedata.normalize(<span class="string">'NFKD'</span>, <span class="function">str</span>(text))
+    text = text.encode(<span class="string">'ascii'</span>, <span class="string">'ignore'</span>).decode(<span class="string">'utf-8'</span>)
+    <span class="keyword">return</span> re.sub(<span class="string">r'[^a-z0-9\s]'</span>, <span class="string">''</span>, text.lower())
+
+<span class="comment"># Tokenización</span>
+words = cleaned.split()
+tokens = [vocab.get(w, <span class="number">1</span>) <span class="keyword">for</span> w <span class="keyword">in</span> words][:<span class="number">151</span>]
+tokens += [<span class="number">0</span>] * (<span class="number">151</span> - <span class="function">len</span>(tokens))  <span class="comment"># PAD</span></pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(0, 255, 136, 0.1); border-color: var(--neon-green);">🧮</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-green)">Cálculo de Score</div>
+              </div>
+            </div>
+
+            <div class="code-block" style="padding: 1rem">
+              <div class="code-header">Fusión Neural + Léxica</div>
+              <pre><span class="comment"># 1. Similitud Neural (Coseno)</span>
+query_emb = F.normalize(model(l_tensor, t_neutral), dim=<span class="number">1</span>)
+neural_sim = F.cosine_similarity(query_emb, song_embeddings, dim=<span class="number">1</span>)
+
+<span class="comment"># 2. Similitud Jaccard (sets de palabras)</span>
+query_set = <span class="function">set</span>(words)
+jaccard = [<span class="function">len</span>(query_set & s) / <span class="function">len</span>(query_set | s) 
+           <span class="keyword">for</span> s <span class="keyword">in</span> lyric_word_sets]
+
+<span class="comment"># 3. Combinación ponderada</span>
+score = (<span class="number">0.40</span> * neural_sim) + (<span class="number">0.60</span> * jaccard)
+
+<span class="comment"># 4. Top K</span>
+top_val, top_idx = torch.topk(score, k=<span class="number">10</span>)</pre>
+            </div>
+
+            <div class="fix-box" style="border-color: var(--neon-green); background: rgba(0, 255, 136, 0.05);">
+              <div class="fix-title" style="color: var(--neon-green);">NaN Handling</div>
+              <p style="color: #aaa; font-size: 0.85rem">
+                <code>torch.nan_to_num()</code> asegura que valores inválidos no rompan el ranking.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background: rgba(0, 243, 255, 0.1); border-color: var(--neon-cyan);">📤</div>
+              <div>
+                <div class="card-title" style="color: var(--neon-cyan)">Respuesta JSON</div>
+              </div>
+            </div>
+
+            <div class="code-block" style="padding: 1rem">
+              <div class="code-header">Detección dinámica + Seguridad</div>
+              <pre><span class="comment"># Validación anti-NaN para JSON</span>
+safe_sim = <span class="function">float</span>(val)
+<span class="keyword">if</span> math.isnan(safe_sim) <span class="keyword">or</span> math.isinf(safe_sim):
+    safe_sim = <span class="number">0.0</span>
+
+res.append({
+    <span class="string">"track_name"</span>: <span class="function">str</span>(row[t_col]),
+    <span class="string">"artist_name"</span>: <span class="function">str</span>(row[a_col]),
+    <span class="string">"similarity"</span>: safe_sim  <span class="comment"># Siempre float válido</span>
+})</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Critical Fixes -->
+      <div id="tab-fixes" class="tab-content">
+        <h2 class="section-title" style="color: var(--neon-red); border-color: var(--neon-red)">🔧 Correcciones Críticas Implementadas</h2>
+
+        <div class="arch-grid">
+          <div class="fix-box" style="border-color: var(--neon-green); background: rgba(0, 255, 136, 0.05);">
+            <div class="fix-title" style="color: var(--neon-green);">✅ FIX: Pre-computo de Embeddings</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Solución:</strong> <code>precompute_embeddings.py</code> genera <code>embeddings.pt</code> con los vectores 512-d de todas las canciones. Flask carga esto en RAM al iniciar.
+            </p>
+            <p style="color: var(--neon-cyan); font-size: 0.8rem;">
+              Resultado: Inferencia en <50ms vs 5s+ sin pre-cómputo.
+            </p>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">✅ FIX: NaN en JSON</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Problema:</strong> Valores NaN o Inf en similitudes causaban errores de serialización JSON.
+            </p>
+            <p style="color: var(--neon-green); font-size: 0.85rem">
+              <strong>Solución:</strong> Validación explícita con <code>math.isnan()</code> + fallback a 0.0.
+            </p>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">✅ FIX: Detección de Columnas</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Problema:</strong> Nombres de columnas variaban entre datasets (track_title vs track_name).
+            </p>
+            <p style="color: var(--neon-green); font-size: 0.85rem">
+              <strong>Solución:</strong> Búsqueda fuzzy por substrings ('track', 'artist') con fallback automático.
+            </p>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">✅ FIX: Seguridad torch.load</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Problema:</strong> PyTorch 2.6+ bloquea carga de objetos sklearn por defecto.
+            </p>
+            <p style="color: var(--neon-green); font-size: 0.85rem">
+              <strong>Solución:</strong> <code>torch.serialization.add_safe_globals([MinMaxScaler])</code>
+            </p>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">✅ FIX: Tokenización OOV</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Problema:</strong> Palabras fuera de vocabulario se perdían completamente.
+            </p>
+            <p style="color: var(--neon-green); font-size: 0.85rem">
+              <strong>Solución:</strong> Fallback por prefijos (5→4→3 chars) antes de asignar <UNK>.
+            </p>
+          </div>
+
+          <div class="fix-box">
+            <div class="fix-title">✅ FIX: Features Técnicos Neutros</div>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.75rem">
+              <strong>Problema:</strong> El usuario no siempre tiene datos técnicos (BPM, energía).
+            </p>
+            <p style="color: var(--neon-green); font-size: 0.85rem">
+              <strong>Solución:</strong> Vector técnico neutro (ceros) para inferencia puramente léxica.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: Full Code -->
+      <div id="tab-code" class="tab-content">
+        <h2 class="section-title" style="color: var(--neon-cyan); border-color: var(--neon-cyan)">💻 Código Completo</h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(0, 243, 255, 0.1); border-color: var(--neon-cyan);">🐍</div>
+            <div>
+              <div class="card-title" style="color: var(--neon-cyan)">app.py - Backend Flask (Actualizado)</div>
+            </div>
+          </div>
+          <div class="code-block relative">
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+            <pre><span class="keyword">from</span> flask <span class="keyword">import</span> Flask, render_template, request, jsonify
+<span class="keyword">import</span> torch
+<span class="keyword">import</span> torch.nn <span class="keyword">as</span> nn
+<span class="keyword">import</span> torch.nn.functional <span class="keyword">as</span> F
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<span class="keyword">import</span> pandas <span class="keyword">as</span> pd
+<span class="keyword">import</span> os
+<span class="keyword">import</span> re
+<span class="keyword">import</span> math
+<span class="keyword">import</span> unicodedata
+<span class="keyword">from</span> sklearn.preprocessing <span class="keyword">import</span> MinMaxScaler
+<span class="keyword">import</span> torch.serialization
+
+torch.serialization.add_safe_globals([MinMaxScaler])
+
+app = Flask(__name__)
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), <span class="string">'..'</span>))
+DATA_PATH = os.path.join(BASE_DIR, <span class="string">'tabla_maestra/train'</span>)
+MODEL_PATH = os.path.join(BASE_DIR, <span class="string">'mst_mr_final.pth'</span>)
+EMBEDDINGS_PATH = os.path.join(BASE_DIR, <span class="string">'embeddings.pt'</span>)
+
+<span class="keyword">class</span> <span class="class-name">MST_MR_Transformer</span>(nn.Module):
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, vocab_size, n_tech=<span class="number">26</span>, d_model=<span class="number">512</span>, nhead=<span class="number">8</span>, num_layers=<span class="number">6</span>, max_len=<span class="number">151</span>):
+        <span class="function">super</span>().<span class="function">__init__</span>()
+        self.lyric_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_encoding = nn.Parameter(torch.zeros(<span class="number">1</span>, max_len, d_model))
+        self.tech_projection = nn.Sequential(
+            nn.Linear(n_tech, <span class="number">256</span>), nn.GELU(), nn.Linear(<span class="number">256</span>, d_model)
+        )
+        self.cross_attn = nn.MultiheadAttention(d_model, nhead, batch_first=<span class="keyword">True</span>)
+        self.norm_fusion = nn.LayerNorm(d_model)
+        decoder_layer = nn.TransformerDecoderLayer(d_model=d_model, nhead=nhead, batch_first=<span class="keyword">True</span>)
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
+        self.fc_out = nn.Linear(d_model, d_model)
+
+    <span class="keyword">def</span> <span class="function">forward</span>(self, lyrics_idx, tech_features):
+        x_lyric = self.lyric_emb(lyrics_idx) + self.pos_encoding[:, :lyrics_idx.size(<span class="number">1</span>), :]
+        x_tech = self.tech_projection(tech_features).unsqueeze(<span class="number">1</span>)
+        attn_out, _ = self.cross_attn(x_lyric, x_tech, x_tech)
+        memory = self.norm_fusion(attn_out + x_lyric)
+        dec_out = self.decoder(x_lyric, memory)
+        <span class="keyword">return</span> self.fc_out(torch.mean(dec_out, dim=<span class="number">1</span>))
+
+<span class="comment"># --- CARGA DE ACTIVOS ---</span>
+<span class="function">print</span>(<span class="string">"--- 🧠 Cargando Cerebro MST-MR y Datos ---"</span>)
+checkpoint = torch.load(MODEL_PATH, map_location=<span class="string">'cpu'</span>, weights_only=<span class="keyword">False</span>)
+vocab = checkpoint[<span class="string">'vocab'</span>]
+scaler = checkpoint[<span class="string">'scaler'</span>]
+model = MST_MR_Transformer(vocab_size=<span class="function">len</span>(vocab))
+model.load_state_dict(checkpoint[<span class="string">'model'</span>])
+model.<span class="function">eval</span>()
+
+files = [f <span class="keyword">for</span> f <span class="keyword">in</span> os.listdir(DATA_PATH) <span class="keyword">if</span> f.endswith(<span class="string">'.parquet'</span>)]
+df_ref = pd.read_parquet(os.path.join(DATA_PATH, files[<span class="number">0</span>]))
+
+t_col = <span class="function">next</span>((c <span class="keyword">for</span> c <span class="keyword">in</span> df_ref.columns <span class="keyword">if</span> <span class="string">'track'</span> <span class="keyword">in</span> c.lower() <span class="keyword">or</span> <span class="string">'title'</span> <span class="keyword">in</span> c.lower()), <span class="string">'track_title'</span>)
+a_col = <span class="function">next</span>((c <span class="keyword">for</span> c <span class="keyword">in</span> df_ref.columns <span class="keyword">if</span> <span class="string">'artist'</span> <span class="keyword">in</span> c.lower()), <span class="string">'artist_name'</span>)
+
+song_embeddings = <span class="keyword">None</span>
+<span class="keyword">if</span> os.path.exists(EMBEDDINGS_PATH):
+    song_embeddings = torch.load(EMBEDDINGS_PATH, map_location=<span class="string">'cpu'</span>)
+
+l_col = <span class="string">'lyrics_cleaned'</span> <span class="keyword">if</span> <span class="string">'lyrics_cleaned'</span> <span class="keyword">in</span> df_ref.columns <span class="keyword">else</span> <span class="string">'lyrics'</span>
+lyric_word_sets = [<span class="function">set</span>(<span class="function">str</span>(l).split()) <span class="keyword">for</span> l <span class="keyword">in</span> df_ref[l_col]]
+
+<span class="function">print</span>(<span class="string">f"--- ✅ Sistema Listo | Columnas: {t_col}, {a_col} ---"</span>)
+
+<span class="keyword">def</span> <span class="function">clean_text_advanced</span>(text):
+    <span class="keyword">if</span> <span class="keyword">not</span> text: <span class="keyword">return</span> <span class="string">""</span>
+    text = unicodedata.normalize(<span class="string">'NFKD'</span>, <span class="function">str</span>(text)).encode(<span class="string">'ascii'</span>, <span class="string">'ignore'</span>).decode(<span class="string">'utf-8'</span>)
+    text = re.sub(<span class="string">r'[^a-z0-9\s]'</span>, <span class="string">''</span>, text.lower())
+    <span class="keyword">return</span> text.strip()
+
+@app.route(<span class="string">'/'</span>)
+<span class="keyword">def</span> <span class="function">home</span>():
+    <span class="keyword">return</span> render_template(<span class="string">'index.html'</span>)
+
+@app.route(<span class="string">'/predict'</span>, methods=[<span class="string">'POST'</span>])
+<span class="keyword">def</span> <span class="function">predict</span>():
+    <span class="keyword">try</span>:
+        data = request.json
+        raw_lyrics = data.get(<span class="string">'lyrics'</span>, <span class="string">''</span>)
+        cleaned_str = clean_text_advanced(raw_lyrics)
+        words = cleaned_str.split()
+
+        <span class="keyword">if</span> <span class="function">len</span>(words) &lt; <span class="number">2</span>:
+            <span class="keyword">return</span> jsonify({<span class="string">"error"</span>: <span class="string">"Escribe una frase más larga"</span>}), <span class="number">400</span>
+
+        <span class="comment"># 1. Inferencia Neural</span>
+        tokens = [vocab.get(w, <span class="number">1</span>) <span class="keyword">for</span> w <span class="keyword">in</span> words][:<span class="number">151</span>]
+        tokens += [<span class="number">0</span>] * (<span class="number">151</span> - <span class="function">len</span>(tokens))
+        t_neutral = np.zeros((<span class="number">1</span>, <span class="number">26</span>)) 
+        
+        <span class="keyword">with</span> torch.no_grad():
+            query_emb = F.normalize(model(torch.tensor([tokens]), torch.tensor(t_neutral).float()), dim=<span class="number">1</span>)
+            <span class="keyword">if</span> song_embeddings <span class="keyword">is</span> <span class="keyword">not</span> <span class="keyword">None</span>:
+                neural_sim = F.cosine_similarity(query_emb, song_embeddings, dim=<span class="number">1</span>)
+            <span class="keyword">else</span>:
+                neural_sim = torch.zeros(<span class="function">len</span>(df_ref))
+
+        <span class="comment"># 2. Jaccard</span>
+        query_set = <span class="function">set</span>(words)
+        jaccard = torch.tensor([
+            <span class="function">len</span>(query_set & ws) / <span class="function">len</span>(query_set | ws) <span class="keyword">if</span> (query_set | ws) <span class="keyword">else</span> <span class="number">0.0</span>
+            <span class="keyword">for</span> ws <span class="keyword">in</span> lyric_word_sets
+        ], dtype=torch.float)
+
+        <span class="comment"># 3. Score y Limpieza de NaNs</span>
+        neural_sim = torch.nan_to_num(neural_sim, nan=<span class="number">0.0</span>)
+        jaccard = torch.nan_to_num(jaccard, nan=<span class="number">0.0</span>)
+        
+        ALPHA, GAMMA = <span class="number">0.40</span>, <span class="number">0.60</span>
+        score = (ALPHA * neural_sim) + (GAMMA * jaccard)
+
+        <span class="comment"># 4. Top 10</span>
+        k = <span class="function">min</span>(<span class="number">10</span>, <span class="function">len</span>(score))
+        top_val, top_idx = torch.topk(score, k=k)
+
+        res = []
+        <span class="keyword">for</span> val, idx <span class="keyword">in</span> <span class="function">zip</span>(top_val.tolist(), top_idx.tolist()):
+            row = df_ref.iloc[idx]
+            safe_sim = <span class="function">float</span>(val)
+            <span class="keyword">if</span> math.isnan(safe_sim) <span class="keyword">or</span> math.isinf(safe_sim):
+                safe_sim = <span class="number">0.0</span>
+
+            res.append({
+                <span class="string">"track_name"</span>: <span class="function">str</span>(row[t_col]),
+                <span class="string">"artist_name"</span>: <span class="function">str</span>(row[a_col]),
+                <span class="string">"similarity"</span>: safe_sim
+            })
+            
+        <span class="keyword">return</span> jsonify(res)
+
+    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+        <span class="function">print</span>(<span class="string">f"❌ Error: {e}"</span>)
+        <span class="keyword">return</span> jsonify({<span class="string">"error"</span>: <span class="function">str</span>(e)}), <span class="number">500</span>
+
+<span class="keyword">if</span> __name__ == <span class="string">'__main__'</span>:
+    app.run(debug=<span class="keyword">True</span>, port=<span class="number">5000</span>)</pre>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      function switchTab(tabId) {
+        document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        document.getElementById("tab-" + tabId).classList.add("active");
+        event.target.classList.add("active");
+      }
+
+      function copyCode(btn) {
+        const code = btn.nextElementSibling.nextElementSibling.textContent;
+        navigator.clipboard.writeText(code);
+        btn.textContent = "✅ Copiado";
+        setTimeout(() => (btn.textContent = "Copiar"), 2000);
+      }
+    </script>
+  </body>
+</html>

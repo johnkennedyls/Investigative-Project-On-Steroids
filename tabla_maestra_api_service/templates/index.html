@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <title>EchoPulse AI - Buscador de Letras</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      :root {
+        --neon: #00f2ff;
+        --bg: #0f0f13;
+        --card: #1a1a20;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--neon);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+        margin: 0;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 700px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 30px;
+        border: 2px solid var(--neon);
+        border-radius: 20px;
+        box-shadow: 0 0 25px rgba(0, 242, 255, 0.2);
+      }
+
+      h1 {
+        text-align: center;
+        letter-spacing: 3px;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+      }
+      .subtitle {
+        text-align: center;
+        color: #888;
+        font-size: 0.9rem;
+        margin-bottom: 30px;
+      }
+
+      textarea {
+        width: 100%;
+        height: 150px;
+        background: #000;
+        color: #fff;
+        border: 1px solid var(--neon);
+        padding: 15px;
+        border-radius: 10px;
+        font-size: 1rem;
+        resize: none;
+        outline: none;
+        font-family: inherit;
+      }
+
+      button {
+        width: 100%;
+        padding: 15px;
+        margin-top: 20px;
+        background: var(--neon);
+        color: #000;
+        border: none;
+        border-radius: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: 0.3s;
+      }
+
+      button:hover {
+        background: #fff;
+        box-shadow: 0 0 15px #fff;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .results-list {
+        list-style: none;
+        padding: 0;
+        margin-top: 30px;
+      }
+
+      .song-card {
+        background: var(--card);
+        margin-bottom: 15px;
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 5px solid var(--neon);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        animation: slideIn 0.3s ease-out forwards;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .song-info .title {
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+      .song-info .artist {
+        color: var(--neon);
+        font-size: 0.9rem;
+        margin-top: 4px;
+      }
+
+      .match-badge {
+        text-align: center;
+        background: rgba(0, 242, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--neon);
+        min-width: 90px;
+      }
+
+      .match-val {
+        font-size: 1.1rem;
+        font-weight: bold;
+        display: block;
+      }
+      .match-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        color: #888;
+      }
+
+      .error {
+        color: #ff4d4d;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+      .loading {
+        color: #888;
+        text-align: center;
+        margin-top: 20px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>⚡ ECHOPULSE AI</h1>
+      <p class="subtitle">Buscador Semántico MST-MR | Top 10 Canciones</p>
+
+      <textarea
+        id="lyricInput"
+        placeholder="Escribe un fragmento de la letra aquí (ej: 'I'm feeling lonely under the city lights')..."
+      ></textarea>
+
+      <button id="searchBtn" onclick="performSearch()">
+        Encontrar canciones
+      </button>
+
+      <div id="status"></div>
+      <ul id="results" class="results-list"></ul>
+    </div>
+
+    <script>
+      async function performSearch() {
+        const lyrics = document.getElementById("lyricInput").value.trim();
+        const resultsUl = document.getElementById("results");
+        const btn = document.getElementById("searchBtn");
+        const status = document.getElementById("status");
+
+        if (lyrics.split(/\s+/).length < 2) {
+          status.innerHTML =
+            '<p class="error">⚠️ Escribe al menos 2 palabras.</p>';
+          return;
+        }
+
+        // Bloquear interfaz
+        btn.disabled = true;
+        btn.innerText = "⏳ PROCESANDO RED NEURONAL...";
+        resultsUl.innerHTML = "";
+        status.innerHTML =
+          '<p class="loading">Analizando similitud léxica y semántica...</p>';
+
+        try {
+          const response = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lyrics: lyrics }),
+          });
+
+          const data = await response.json();
+
+          if (data.error) throw new Error(data.error);
+
+          status.innerHTML = ""; // Limpiar loading
+
+          if (data.length === 0) {
+            status.innerHTML =
+              '<p class="error">No se encontraron coincidencias.</p>';
+          } else {
+            data.forEach((song, i) => {
+              // CAMBIO CLAVE: Usamos 'track_name' y 'artist_name' que enviamos desde app.py
+              const name = song.track_name || "Sin título";
+              const artist = song.artist_name || "Artista desconocido";
+              const scorePct = (song.similarity * 100).toFixed(1);
+
+              const li = document.createElement("li");
+              li.className = "song-card";
+              li.style.animationDelay = i * 0.05 + "s";
+              li.innerHTML = `
+                        <div class="song-info">
+                            <div class="title">🎵 ${name}</div>
+                            <div class="artist">${artist}</div>
+                        </div>
+                        <div class="match-badge">
+                            <span class="match-val">${scorePct}%</span>
+                            <span class="match-label">Similitud</span>
+                        </div>
+                    `;
+              resultsUl.appendChild(li);
+            });
+          }
+        } catch (err) {
+          status.innerHTML = `<p class="error">❌ Error: ${err.message}</p>`;
+        } finally {
+          btn.disabled = false;
+          btn.innerText = "Encontrar canciones";
+        }
+      }
+
+      // Permitir buscar con Ctrl+Enter
+      document.getElementById("lyricInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          performSearch();
+        }
+      });
+    </script>
+  </body>
+</html>

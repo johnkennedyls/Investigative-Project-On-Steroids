@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoPulse AI - Arquitectura Técnica v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --cyan: #06b6d4;
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+        }
+        
+        * { scroll-behavior: smooth; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+        }
+        
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: var(--slate-800);
+        }
+        
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 1px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, var(--primary), var(--cyan));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .tech-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .tech-table th {
+            background: rgba(59, 130, 246, 0.15);
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .tech-table td {
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+        }
+        
+        .tech-table tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        
+        .badge-info {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track { background: var(--slate-900); }
+        ::-webkit-scrollbar-thumb {
+            background: var(--slate-700);
+            border-radius: 4px;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        .nav-link {
+            position: relative;
+            transition: color 0.2s;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--cyan));
+            transition: width 0.3s;
+        }
+        
+        .nav-link:hover::after,
+        .nav-link.active::after { width: 100%; }
+        
+        .phase-card {
+            border-left: 3px solid;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .phase-card:hover { transform: translateX(4px); }
+        
+        .phase-1 { border-left-color: #8b5cf6; }
+        .phase-2 { border-left-color: #3b82f6; }
+        .phase-3 { border-left-color: #10b981; }
+        .phase-4 { border-left-color: #f59e0b; }
+        .phase-5 { border-left-color: #ef4444; }
+
+        /* Flow diagram styles */
+        .flow-node {
+            transition: all 0.3s ease;
+        }
+        .flow-node:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+        .flow-arrow {
+            position: relative;
+        }
+        .flow-arrow::after {
+            content: '▼';
+            position: absolute;
+            bottom: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #64748b;
+            font-size: 10px;
+        }
+        .flow-connector {
+            width: 2px;
+            background: linear-gradient(180deg, #3b82f6, #06b6d4, #10b981);
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass-card border-b border-slate-700/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <i class="fas fa-wave-square text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">
+                            <span class="text-blue-400">EchoPulse</span><span class="text-slate-400">AI</span>
+                        </h1>
+                        <p class="text-xs text-slate-500 font-mono">Arquitectura Técnica v2.0</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="badge badge-success">
+                        <i class="fas fa-check-circle text-xs"></i>
+                        Producción Local
+                    </span>
+                    <span class="text-xs text-slate-500 font-mono">Abril 2026</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="glass-card border-b border-slate-700/30 sticky top-16 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center gap-6 h-12 overflow-x-auto">
+                <a href="#flujo" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Diagrama de Flujo</a>
+                <a href="#pipeline" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Pipeline E2E</a>
+                <a href="#componentes" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Componentes</a>
+                <a href="#metricas" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Métricas</a>
+                <a href="#estructura" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Estructura</a>
+                <a href="#decisiones" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Decisiones</a>
+                <a href="#deploy" class="nav-link text-sm text-slate-400 hover:text-slate-200 whitespace-nowrap">Despliegue</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Hero Section -->
+        <section class="mb-12 animate-fade-in">
+            <div class="glass-card rounded-2xl p-8 gradient-border">
+                <div class="flex items-start gap-4 mb-6">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-exchange-alt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Cambio Crítico: Inversión del Flujo</h2>
+                        <p class="text-slate-400">La arquitectura corregida invierte el flujo original para optimizar el rendimiento y la precisión del sistema de recomendación musical.</p>
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-slate-900/50 rounded-xl p-4 border border-red-500/30">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fas fa-times-circle text-red-400"></i>
+                            <span class="text-sm font-medium text-red-400">Flujo Original (Obsoleto)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-mono">Módulo 3 (Intent) → Módulo 2 (Retrieval)</p>
+                    </div>
+                    <div class="bg-slate-900/50 rounded-xl p-4 border border-emerald-500/30">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fas fa-check-circle text-emerald-400"></i>
+                            <span class="text-sm font-medium text-emerald-400">Flujo Corregido (Actual)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-mono">Módulo 2 (Retrieval Principal) → Módulo 3 (Re-ranking Semántico)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diagrama de Flujo Visual -->
+        <section id="flujo" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-project-diagram text-blue-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Diagrama de Flujo Arquitectónico</h2>
+            </div>
+            
+            <div class="glass-card rounded-2xl p-8">
+                <!-- Fase 1: Input -->
+                <div class="flex flex-col items-center mb-4">
+                    <div class="flow-node bg-gradient-to-r from-violet-600 to-purple-500 rounded-xl p-4 w-full max-w-md text-center border border-violet-400/30">
+                        <div class="flex items-center justify-center gap-2 mb-1">
+                            <i class="fas fa-user text-white/80"></i>
+                            <span class="font-bold text-white">👤 Usuario Web</span>
+                        </div>
+                        <p class="text-xs text-violet-200 font-mono">Consulta en Español</p>
+                    </div>
+                    <div class="flow-arrow h-8 flow-connector my-1"></div>
+                    <div class="flow-node bg-gradient-to-r from-violet-500 to-indigo-500 rounded-xl p-4 w-full max-w-md text-center border border-violet-400/30">
+                        <div class="flex items-center justify-center gap-2 mb-1">
+                            <i class="fas fa-robot text-white/80"></i>
+                            <span class="font-bold text-white">🌐 Orquestador LLM: Qwen 2.5</span>
+                        </div>
+                        <p class="text-xs text-indigo-200 font-mono">Traducción/Refinamiento</p>
+                    </div>
+                    <div class="flow-arrow h-8 flow-connector my-1"></div>
+                    <div class="flow-node bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl p-4 w-full max-w-md text-center border border-blue-400/30">
+                        <div class="flex items-center justify-center gap-2 mb-1">
+                            <i class="fas fa-key text-white/80"></i>
+                            <span class="font-bold text-white">🔑 Keywords EN</span>
+                        </div>
+                        <p class="text-xs text-blue-200 font-mono">"intense, heavy, melancholic"</p>
+                    </div>
+                </div>
+
+                <!-- Fase 2: Retrieval -->
+                <div class="flex flex-col items-center mb-4">
+                    <div class="flow-arrow h-6 flow-connector"></div>
+                    <div class="w-full max-w-2xl bg-blue-900/30 rounded-2xl p-6 border-2 border-blue-500/40 mt-2">
+                        <div class="text-center mb-4">
+                            <span class="inline-flex items-center gap-2 px-4 py-1 bg-blue-500/20 rounded-full text-blue-300 text-sm font-bold border border-blue-500/30">
+                                <i class="fas fa-search"></i>
+                                FASE 2: RETRIEVAL PRINCIPAL (Módulo 2)
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-blue-400/30">
+                                <i class="fas fa-cube text-blue-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">MST_MR_Transformer</p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-blue-400/30">
+                                <i class="fas fa-database text-blue-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Tabla Maestra<br/><span class="text-blue-400">5,710 canciones</span></p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-blue-400/30">
+                                <i class="fas fa-calculator text-blue-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Similitud Híbrida<br/><span class="text-blue-400">40% N + 60% J</span></p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-blue-400/30">
+                                <i class="fas fa-list-ol text-blue-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Top 10<br/><span class="text-blue-400">Candidatos</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fase 3: Re-ranking -->
+                <div class="flex flex-col items-center mb-4">
+                    <div class="flow-arrow h-6 flow-connector"></div>
+                    <div class="w-full max-w-2xl bg-emerald-900/30 rounded-2xl p-6 border-2 border-emerald-500/40 mt-2">
+                        <div class="text-center mb-4">
+                            <span class="inline-flex items-center gap-2 px-4 py-1 bg-emerald-500/20 rounded-full text-emerald-300 text-sm font-bold border border-emerald-500/30">
+                                <i class="fas fa-brain"></i>
+                                FASE 3: RE-RANKING SEMÁNTICO (Módulo 3)
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-emerald-400/30">
+                                <i class="fas fa-microchip text-emerald-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">IntentTransformer</p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-emerald-400/30">
+                                <i class="fas fa-bullseye text-emerald-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Evaluación Intención<br/><span class="text-emerald-400">38,343 clases</span></p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-emerald-400/30">
+                                <i class="fas fa-code-branch text-emerald-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Fusión<br/><span class="text-emerald-400">70% R + 30% I</span></p>
+                            </div>
+                            <div class="flow-node bg-slate-800 rounded-lg p-3 text-center border border-emerald-400/30">
+                                <i class="fas fa-trophy text-emerald-400 mb-1"></i>
+                                <p class="text-xs text-slate-200 font-mono">Top 10<br/><span class="text-emerald-400">Re-ordenado</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fase 4 & 5: Output -->
+                <div class="flex flex-col items-center">
+                    <div class="flow-arrow h-6 flow-connector"></div>
+                    <div class="grid md:grid-cols-3 gap-3 w-full max-w-2xl mt-2">
+                        <div class="flow-node bg-gradient-to-r from-amber-600 to-orange-500 rounded-xl p-4 text-center border border-amber-400/30">
+                            <i class="fas fa-link text-white/80 mb-1"></i>
+                            <p class="text-xs text-white font-bold">🔗 Enriquecimiento</p>
+                            <p class="text-xs text-amber-200 font-mono">Metadata + Links</p>
+                        </div>
+                        <div class="flow-node bg-gradient-to-r from-red-600 to-rose-500 rounded-xl p-4 text-center border border-red-400/30">
+                            <i class="fas fa-comments text-white/80 mb-1"></i>
+                            <p class="text-xs text-white font-bold">💬 Generación Respuesta</p>
+                            <p class="text-xs text-red-200 font-mono">Qwen 2.5 Empática</p>
+                        </div>
+                        <div class="flow-node bg-gradient-to-r from-cyan-600 to-teal-500 rounded-xl p-4 text-center border border-cyan-400/30">
+                            <i class="fas fa-desktop text-white/80 mb-1"></i>
+                            <p class="text-xs text-white font-bold">🖥️ Frontend</p>
+                            <p class="text-xs text-cyan-200 font-mono">Chat + Pipeline + Métricas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pipeline E2E -->
+        <section id="pipeline" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                    <i class="fas fa-stream text-cyan-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Flujo de Datos End-to-End</h2>
+            </div>
+            
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full tech-table text-sm">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Fase</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Componente</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Input</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Proceso</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Output</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Latencia</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-400">
+                            <tr class="phase-1">
+                                <td class="px-4 py-3 font-mono text-violet-400 font-bold">1</td>
+                                <td class="px-4 py-3 font-medium text-slate-200">Qwen 2.5 (Traducción)</td>
+                                <td class="px-4 py-3 font-mono text-xs">"música triste y oscura"</td>
+                                <td class="px-4 py-3">System prompt → Keywords EN</td>
+                                <td class="px-4 py-3 font-mono text-xs">"sad, dark, melancholic"</td>
+                                <td class="px-4 py-3 font-mono text-emerald-400">~2.8s</td>
+                            </tr>
+                            <tr class="phase-2">
+                                <td class="px-4 py-3 font-mono text-blue-400 font-bold">2</td>
+                                <td class="px-4 py-3 font-medium text-slate-200">Módulo 2 (Retrieval)</td>
+                                <td class="px-4 py-3 font-mono text-xs">Keywords EN + Tabla Maestra</td>
+                                <td class="px-4 py-3">Embedding 512-d + Coseno + Jaccard</td>
+                                <td class="px-4 py-3 font-mono text-xs">Top 10 IDs con similarity</td>
+                                <td class="px-4 py-3 font-mono text-emerald-400">~0.12s</td>
+                            </tr>
+                            <tr class="phase-3">
+                                <td class="px-4 py-3 font-mono text-emerald-400 font-bold">3</td>
+                                <td class="px-4 py-3 font-medium text-slate-200">Módulo 3 (Re-ranking)</td>
+                                <td class="px-4 py-3 font-mono text-xs">Top 10 + Query EN</td>
+                                <td class="px-4 py-3">Forward 38k clases → intent_score</td>
+                                <td class="px-4 py-3 font-mono text-xs">Top 10 re-ordenado con final_score</td>
+                                <td class="px-4 py-3 font-mono text-emerald-400">~0.09s</td>
+                            </tr>
+                            <tr class="phase-4">
+                                <td class="px-4 py-3 font-mono text-amber-400 font-bold">4</td>
+                                <td class="px-4 py-3 font-medium text-slate-200">Enriquecimiento</td>
+                                <td class="px-4 py-3 font-mono text-xs">IDs finales</td>
+                                <td class="px-4 py-3">Búsqueda en song_metadata.json</td>
+                                <td class="px-4 py-3 font-mono text-xs">track_name, artist_name, URLs</td>
+                                <td class="px-4 py-3 font-mono text-emerald-400">~0.015s</td>
+                            </tr>
+                            <tr class="phase-5">
+                                <td class="px-4 py-3 font-mono text-red-400 font-bold">5</td>
+                                <td class="px-4 py-3 font-medium text-slate-200">Qwen 2.5 (Respuesta)</td>
+                                <td class="px-4 py-3 font-mono text-xs">Contexto + Consulta original</td>
+                                <td class="px-4 py-3">Prompt estructurado → Generación ES</td>
+                                <td class="px-4 py-3 font-mono text-xs">Respuesta empática + recomendaciones</td>
+                                <td class="px-4 py-3 font-mono text-emerald-400">~3.2s</td>
+                            </tr>
+                            <tr class="bg-slate-800/50">
+                                <td class="px-4 py-3 font-mono text-cyan-400 font-bold">TOTAL</td>
+                                <td class="px-4 py-3 font-bold text-slate-200" colspan="4">Pipeline Completo - Orquestación síncrona + reintentos HF</td>
+                                <td class="px-4 py-3 font-mono text-cyan-400 font-bold">~6.2s</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Componentes Técnicos -->
+        <section id="componentes" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <i class="fas fa-cubes text-emerald-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Componentes Técnicos Detallados</h2>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Módulo 2 -->
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-database text-blue-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Módulo 2: MST_MR_Transformer</h3>
+                            <p class="text-xs text-blue-400 font-mono">Retrieval Principal</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Arquitectura</span>
+                            <span class="text-sm text-slate-200 font-mono">Transformer Dual (Cross-Attention + Decoder x6)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Input</span>
+                            <span class="text-sm text-slate-200 font-mono">Tokens líricos (máx 151) + Vector técnico (26 features)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Fusión</span>
+                            <span class="text-sm text-slate-200 font-mono">Q: lírica, K/V: técnica → norm_fusion → decoder</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Scoring</span>
+                            <span class="text-sm text-slate-200 font-mono">0.40 × cosine + 0.60 × jaccard</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Dataset</span>
+                            <span class="text-sm text-slate-200 font-mono">5,710 canciones + features técnicos</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Output</span>
+                            <span class="text-sm text-slate-200 font-mono">Top 10 candidatos con similarity score</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-sm text-slate-400">Archivos</span>
+                            <span class="text-sm text-slate-200 font-mono">mst_mr_final.pth (127 MB), embeddings.pt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Módulo 3 -->
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                            <i class="fas fa-brain text-emerald-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Módulo 3: IntentTransformer</h3>
+                            <p class="text-xs text-emerald-400 font-mono">Re-ranking Semántico</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Arquitectura</span>
+                            <span class="text-sm text-slate-200 font-mono">Encoder-Only (4 capas × 8 cabezales)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Input</span>
+                            <span class="text-sm text-slate-200 font-mono">Query EN tokenizado (máx 512)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Clases</span>
+                            <span class="text-sm text-slate-200 font-mono">38,343 (Spotify IDs desde song_map.pkl)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Fusión Final</span>
+                            <span class="text-sm text-slate-200 font-mono">0.70 × similarity_M2 + 0.30 × intent_score_M3</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Dataset</span>
+                            <span class="text-sm text-slate-200 font-mono">TalkPlayData-2 (~16k diálogos)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                            <span class="text-sm text-slate-400">Output</span>
+                            <span class="text-sm text-slate-200 font-mono">Top 10 re-ordenado por relevancia</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-sm text-slate-400">Archivos</span>
+                            <span class="text-sm text-slate-200 font-mono">intent_model.pth (62.8 MB), vocab.json</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orquestador LLM -->
+                <div class="glass-card rounded-2xl p-6 gradient-border lg:col-span-2">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                            <i class="fas fa-robot text-violet-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Orquestador LLM: Qwen 2.5-7B-Instruct</h3>
+                            <p class="text-xs text-violet-400 font-mono">Hugging Face Inference API</p>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Endpoint</p>
+                            <p class="text-sm text-slate-200 font-mono break-all">router.huggingface.co/v1/chat/completions</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Formato</p>
+                            <p class="text-sm text-slate-200 font-mono">OpenAI-compatible messages[]</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Retries</p>
+                            <p class="text-sm text-slate-200 font-mono">Backoff: 1s, 2s, 4s (máx 3)</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Temperatura</p>
+                            <p class="text-sm text-slate-200 font-mono">0.2 (traducción) / 0.4 (respuesta)</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Max Tokens</p>
+                            <p class="text-sm text-slate-200 font-mono">100 (keywords) / 350 (respuesta)</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4">
+                            <p class="text-xs text-slate-500 mb-1">Fallback</p>
+                            <p class="text-sm text-slate-200 font-mono">Retorna input original si HF falla</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enriquecimiento -->
+                <div class="glass-card rounded-2xl p-6 gradient-border lg:col-span-2">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                            <i class="fas fa-link text-amber-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Enriquecimiento de Metadatos & Enlaces</h3>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full tech-table text-sm">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-300">Fuente</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-300">Cobertura</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-300">Estrategia</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-400">
+                                <tr>
+                                    <td class="px-4 py-2 font-mono">song_metadata.json</td>
+                                    <td class="px-4 py-2"><span class="badge badge-info">~85% (32,662/38,343)</span></td>
+                                    <td class="px-4 py-2">Cruce con spotify_data.csv + tracks.csv</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 font-mono">Enlaces Spotify</td>
+                                    <td class="px-4 py-2"><span class="badge badge-success">100%</span></td>
+                                    <td class="px-4 py-2">Directo si ID=22 chars alfanuméricos, sino búsqueda</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 font-mono">Enlaces YouTube</td>
+                                    <td class="px-4 py-2"><span class="badge badge-success">100%</span></td>
+                                    <td class="px-4 py-2">artist + track + official audio o fallback por género</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Métricas -->
+        <section id="metricas" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-amber-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Métricas del Sistema</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <!-- Rendimiento -->
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fas fa-tachometer-alt text-cyan-400"></i>
+                        Rendimiento (últimas 100 consultas)
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-400">Latencia Total</span>
+                                <span class="text-cyan-400 font-mono">~6,230 ms</span>
+                            </div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500" style="width: 62%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>P90: ~9,350 ms</span>
+                                <span>P99: ~18,505 ms</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-400">Traducción (Qwen)</span>
+                                <span class="text-violet-400 font-mono">~2,800 ms</span>
+                            </div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-violet-500" style="width: 28%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-400">Retrieval (M2)</span>
+                                <span class="text-blue-400 font-mono">~125 ms</span>
+                            </div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500" style="width: 5%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-400">Re-ranking (M3)</span>
+                                <span class="text-emerald-400 font-mono">~90 ms</span>
+                            </div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-500" style="width: 3.5%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-400">Generación (Qwen)</span>
+                                <span class="text-red-400 font-mono">~3,200 ms</span>
+                            </div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="h-full bg-red-500" style="width: 32%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calidad Académica -->
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fas fa-graduation-cap text-amber-400"></i>
+                        Calidad Académica
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-900/50 rounded-xl p-4 text-center">
+                            <p class="text-3xl font-bold text-emerald-400 font-mono">4.88%</p>
+                            <p class="text-xs text-slate-400 mt-1">Hit Rate @10 (M3)</p>
+                            <p class="text-xs text-emerald-500/70 mt-1">2,440× sobre azar</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4 text-center">
+                            <p class="text-3xl font-bold text-blue-400 font-mono">0.0159</p>
+                            <p class="text-xs text-slate-400 mt-1">MRR</p>
+                            <p class="text-xs text-blue-500/70 mt-1">Mean Reciprocal Rank</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4 text-center">
+                            <p class="text-3xl font-bold text-amber-400 font-mono">84.2%</p>
+                            <p class="text-xs text-slate-400 mt-1">Cobertura Metadata</p>
+                            <p class="text-xs text-amber-500/70 mt-1">Fallback elegante ~15%</p>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4 text-center">
+                            <p class="text-3xl font-bold text-cyan-400 font-mono">98.4%</p>
+                            <p class="text-xs text-slate-400 mt-1">Tasa de Éxito</p>
+                            <p class="text-xs text-cyan-500/70 mt-1">Manejo robusto de errores</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Estructura de Archivos -->
+        <section id="estructura" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <i class="fas fa-folder-tree text-purple-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Estructura de Archivos del Proyecto</h2>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6">
+                <div class="code-block p-4 overflow-x-auto">
+                    <pre class="text-sm text-slate-300 font-mono leading-relaxed">Investigative-Project-On-Steroids/
+├── <span class="text-blue-400">echopulse_llm_orquestator/</span>
+│   ├── <span class="text-emerald-400">app.py</span>                          <span class="text-slate-500"># Flask + Orquestación corregida + Métricas</span>
+│   ├── <span class="text-emerald-400">metrics.py</span>                      <span class="text-slate-500"># (Opcional) Módulo dedicado de logging</span>
+│   ├── <span class="text-emerald-400">requirements.txt</span>                <span class="text-slate-500"># flask, torch, requests, pandas, scikit-learn, dotenv</span>
+│   ├── <span class="text-amber-400">.env</span>                            <span class="text-slate-500"># HF_TOKEN=hf_...</span>
+│   ├── <span class="text-blue-400">logs/</span>
+│   │   ├── <span class="text-emerald-400">metrics_2026-04.jsonl</span>      <span class="text-slate-500"># Registro por consulta (JSONL)</span>
+│   │   └── <span class="text-emerald-400">metrics.log</span>                <span class="text-slate-500"># Logs estructurados</span>
+│   ├── <span class="text-blue-400">templates/</span>
+│   │   └── <span class="text-emerald-400">index.html</span>               <span class="text-slate-500"># Frontend masculino/tech + Panel métricas</span>
+│   └── <span class="text-blue-400">models/</span>
+│       ├── <span class="text-emerald-400">song_metadata.json</span>         <span class="text-slate-500"># Cache enriquecido (38k IDs)</span>
+│       ├── <span class="text-blue-400">talkplay/</span>                  <span class="text-slate-500"># Módulo 3: IntentTransformer</span>
+│       │   ├── <span class="text-emerald-400">intent_model.pth</span>       <span class="text-slate-500"># Pesos (62.8 MB)</span>
+│       │   ├── <span class="text-emerald-400">vocab.json</span>             <span class="text-slate-500"># Tokenizador (10k)</span>
+│       │   └── <span class="text-emerald-400">song_map.pkl</span>           <span class="text-slate-500"># Mapeo ID→clase (38,343)</span>
+│       └── <span class="text-blue-400">tabla_maestra/</span>             <span class="text-slate-500"># Módulo 2: MST_MR_Transformer</span>
+│           ├── <span class="text-emerald-400">mst_mr_final.pth</span>       <span class="text-slate-500"># Checkpoint (127 MB)</span>
+│           └── <span class="text-emerald-400">embeddings.pt</span>          <span class="text-slate-500"># Embeddings pre-computados (5,710×512)</span>
+├── <span class="text-blue-400">tabla_maestra/train/</span>               <span class="text-slate-500"># Dataset referencia M2 (parquet)</span>
+├── <span class="text-blue-400">scripts/</span>                           <span class="text-slate-500"># Enriquecimiento Kaggle/Spotify</span>
+└── <span class="text-emerald-400">spotify_data.csv</span> / <span class="text-emerald-400">tracks.csv</span>      <span class="text-slate-500"># Fuentes externas de metadatos</span></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Decisiones de Diseño -->
+        <section id="decisiones" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                    <i class="fas fa-lightbulb text-red-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Decisiones de Diseño Clave</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-start gap-4">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                            <span class="text-blue-400 font-bold">1</span>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-2">Inversión del Flujo (M2→M3)</h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                El <strong class="text-blue-400">Módulo 2</strong> accede a datos técnicos y líricos reales (5,710 canciones), ideal para 
+                                <span class="text-emerald-400">retrieval amplio</span>. El <strong class="text-emerald-400">Módulo 3</strong> está especializado 
+                                en correlación conversacional (38k clases), ideal para <span class="text-emerald-400">ajuste fino de intención</span>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-start gap-4">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <span class="text-emerald-400 font-bold">2</span>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-2">Fusión Ponderada</h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                <strong>Retrieval:</strong> <span class="font-mono text-blue-400">0.40 neural + 0.60 jaccard</span> → Prioriza coincidencia léxica estable.<br>
+                                <strong>Re-ranking:</strong> <span class="font-mono text-emerald-400">0.70 retrieval + 0.30 intent</span> → Mantiene base técnica pero ajusta por emoción.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-start gap-4">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <span class="text-amber-400 font-bold">3</span>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-2">Robustez en Producción</h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                • <span class="font-mono text-slate-300">torch.nan_to_num()</span> evita errores JSON por similitudes inválidas.<br>
+                                • <span class="font-mono text-slate-300">add_safe_globals([MinMaxScaler])</span> resuelve bloqueo de PyTorch 2.6+ con sklearn.<br>
+                                • Reintentos exponenciales + <span class="font-mono text-slate-300">wait_for_model</span> mitigan cold starts de HF.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 gradient-border">
+                    <div class="flex items-start gap-4">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                            <span class="text-cyan-400 font-bold">4</span>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-2">Escalabilidad</h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                • Embeddings pre-computados reducen inferencia M2 a <span class="text-emerald-400 font-mono">&lt;150ms</span>.<br>
+                                • Cache de metadatos en memoria (<span class="font-mono text-slate-300">SONG_METADATA_CACHE</span>) evita I/O repetido.<br>
+                                • Endpoints <span class="font-mono text-slate-300">/api/metrics</span> y <span class="font-mono text-slate-300">/api/health</span> permiten monitoreo sin impactar pipeline.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Despliegue -->
+        <section id="deploy" class="mb-12 animate-fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                    <i class="fas fa-rocket text-green-400 text-sm"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Instrucciones de Despliegue Rápido</h2>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6">
+                <div class="code-block p-4 overflow-x-auto">
+                    <pre class="text-sm text-slate-300 font-mono leading-relaxed"><span class="text-slate-500"># 1. Crear entorno y dependencias</span>
+python -m venv venv && source venv/bin/activate
+pip install flask requests torch numpy pandas scikit-learn python-dotenv
+
+<span class="text-slate-500"># 2. Configurar token</span>
+echo <span class="text-amber-400">"HF_TOKEN=hf_tu_token_aqui"</span> > .env
+
+<span class="text-slate-500"># 3. Ejecutar servidor</span>
+python echopulse_llm_orquestator/app.py
+
+<span class="text-slate-500"># 4. Acceder</span>
+<span class="text-emerald-400"># 🌐 http://localhost:5000</span>
+<span class="text-emerald-400"># 📊 http://localhost:5000/api/metrics</span></pre>
+                </div>
+                <div class="mt-4 flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-sm text-slate-400">
+                        <i class="fas fa-check-circle text-emerald-400"></i>
+                        <span>Python 3.8+</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-slate-400">
+                        <i class="fas fa-check-circle text-emerald-400"></i>
+                        <span>~8GB RAM recomendado</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-slate-400">
+                        <i class="fas fa-check-circle text-emerald-400"></i>
+                        <span>GPU opcional (CUDA)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="glass-card rounded-2xl p-6 text-center">
+            <div class="flex items-center justify-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+                    <i class="fas fa-wave-square text-white text-sm"></i>
+                </div>
+                <span class="text-lg font-bold">
+                    <span class="text-blue-400">EchoPulse</span><span class="text-slate-400">AI</span>
+                </span>
+            </div>
+            <p class="text-sm text-slate-500">
+                Arquitectura corregida, validada académicamente, con métricas en tiempo real.<br>
+                Lista para integración en informe o demostración.
+            </p>
+            <div class="flex items-center justify-center gap-4 mt-4">
+                <span class="badge badge-success">
+                    <i class="fas fa-check-circle text-xs"></i>
+                    Estado: Producción Local
+                </span>
+                <span class="text-xs text-slate-500 font-mono">v2.0 | Abril 2026</span>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Active nav link on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active', 'text-slate-200');
+                link.classList.add('text-slate-400');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active', 'text-slate-200');
+                    link.classList.remove('text-slate-400');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

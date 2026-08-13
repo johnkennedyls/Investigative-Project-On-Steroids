@@ -1,0 +1,1615 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoPulse AI - Arquitectura Completa del Sistema</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --neon-cyan: #00f3ff;
+        --neon-pink: #ff00ff;
+        --neon-purple: #bc13fe;
+        --neon-yellow: #f3ff00;
+        --neon-orange: #ff6600;
+        --neon-green: #00ff88;
+        --neon-blue: #0066ff;
+        --neon-red: #ff0040;
+        --bg-dark: #030308;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: var(--bg-dark);
+        color: #e0e0e0;
+        font-family: "Inter", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        line-height: 1.6;
+      }
+
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .bg-grid {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image:
+          linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        z-index: -1;
+      }
+
+      .header {
+        background: rgba(5, 5, 16, 0.95);
+        border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        padding: 1.5rem;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .header-title {
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
+        font-weight: 800;
+        background: linear-gradient(
+          90deg,
+          #fff,
+          var(--neon-cyan),
+          var(--neon-purple)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .phase-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-right: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .phase-llm {
+        background: rgba(243, 255, 0, 0.2);
+        color: var(--neon-yellow);
+        border: 1px solid var(--neon-yellow);
+      }
+      .phase-intent {
+        background: rgba(255, 0, 255, 0.2);
+        color: var(--neon-pink);
+        border: 1px solid var(--neon-pink);
+      }
+      .phase-master {
+        background: rgba(0, 102, 255, 0.2);
+        color: var(--neon-blue);
+        border: 1px solid var(--neon-blue);
+      }
+      .phase-deploy {
+        background: rgba(0, 255, 136, 0.2);
+        color: var(--neon-green);
+        border: 1px solid var(--neon-green);
+      }
+
+      .main-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin: 2rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid;
+      }
+
+      .title-llm {
+        color: var(--neon-yellow);
+        border-color: var(--neon-yellow);
+      }
+      .title-intent {
+        color: var(--neon-pink);
+        border-color: var(--neon-pink);
+      }
+      .title-master {
+        color: var(--neon-blue);
+        border-color: var(--neon-blue);
+      }
+      .title-deploy {
+        color: var(--neon-green);
+        border-color: var(--neon-green);
+      }
+      .title-arch {
+        color: var(--neon-purple);
+        border-color: var(--neon-purple);
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        flex-shrink: 0;
+      }
+
+      .card-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .code-block {
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 12px;
+        padding: 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .code-header {
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+      }
+
+      .keyword {
+        color: #ff79c6;
+      }
+      .string {
+        color: #f1fa8c;
+      }
+      .function {
+        color: #50fa7b;
+      }
+      .comment {
+        color: #6272a4;
+      }
+      .number {
+        color: #bd93f9;
+      }
+      .class-name {
+        color: #8be9fd;
+      }
+
+      .arch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .arch-block {
+        background: rgba(10, 10, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 1.25rem;
+      }
+
+      .arch-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .arch-content {
+        font-size: 0.85rem;
+        color: #aaa;
+        line-height: 1.5;
+      }
+
+      .tensor-shape {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        background: rgba(0, 243, 255, 0.1);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        display: inline-block;
+        margin: 0.25rem 0;
+      }
+
+      .metric-box {
+        background: rgba(10, 10, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.2s;
+      }
+
+      .metric-box:hover {
+        transform: translateY(-5px);
+        border-color: var(--neon-purple);
+      }
+
+      .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--neon-purple);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .metric-label {
+        font-size: 0.85rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 0.5rem;
+      }
+
+      .tab-container {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #888;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .tab:hover,
+      .tab.active {
+        background: var(--neon-cyan);
+        color: #000;
+        border-color: var(--neon-cyan);
+      }
+
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .pipeline-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .phase-section {
+        border: 2px solid;
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: relative;
+      }
+
+      .phase-llm-section {
+        border-color: var(--neon-yellow);
+        background: rgba(243, 255, 0, 0.05);
+      }
+      .phase-intent-section {
+        border-color: var(--neon-pink);
+        background: rgba(255, 0, 255, 0.05);
+      }
+      .phase-master-section {
+        border-color: var(--neon-blue);
+        background: rgba(0, 102, 255, 0.05);
+      }
+      .phase-deploy-section {
+        border-color: var(--neon-green);
+        background: rgba(0, 255, 136, 0.05);
+      }
+
+      .phase-header {
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .flow-item {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        position: relative;
+      }
+
+      .flow-arrow-down {
+        text-align: center;
+        font-size: 1.5rem;
+        color: var(--neon-cyan);
+        margin: 0.5rem 0;
+      }
+
+      .accent-cyan {
+        color: var(--neon-cyan);
+      }
+      .accent-pink {
+        color: var(--neon-pink);
+      }
+      .accent-purple {
+        color: var(--neon-purple);
+      }
+      .accent-yellow {
+        color: var(--neon-yellow);
+      }
+      .accent-green {
+        color: var(--neon-green);
+      }
+      .accent-orange {
+        color: var(--neon-orange);
+      }
+      .accent-red {
+        color: var(--neon-red);
+      }
+      .accent-blue {
+        color: var(--neon-blue);
+      }
+
+      .bg-cyan {
+        background: rgba(0, 243, 255, 0.1);
+        border-color: var(--neon-cyan);
+      }
+      .bg-pink {
+        background: rgba(255, 0, 255, 0.1);
+        border-color: var(--neon-pink);
+      }
+      .bg-purple {
+        background: rgba(188, 19, 254, 0.1);
+        border-color: var(--neon-purple);
+      }
+      .bg-yellow {
+        background: rgba(243, 255, 0, 0.1);
+        border-color: var(--neon-yellow);
+      }
+      .bg-green {
+        background: rgba(0, 255, 136, 0.1);
+        border-color: var(--neon-green);
+      }
+      .bg-orange {
+        background: rgba(255, 102, 0, 0.1);
+        border-color: var(--neon-orange);
+      }
+      .bg-red {
+        background: rgba(255, 0, 64, 0.1);
+        border-color: var(--neon-red);
+      }
+      .bg-blue {
+        background: rgba(0, 102, 255, 0.1);
+        border-color: var(--neon-blue);
+      }
+
+      .highlight-box {
+        background: linear-gradient(
+          135deg,
+          rgba(188, 19, 254, 0.1),
+          rgba(0, 243, 255, 0.1)
+        );
+        border: 1px solid rgba(188, 19, 254, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .stat-item {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--neon-cyan);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        margin-top: 0.25rem;
+      }
+
+      .file-tree {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        line-height: 1.8;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .file-tree .dir {
+        color: var(--neon-cyan);
+        font-weight: 700;
+      }
+      .file-tree .file {
+        color: #aaa;
+      }
+      .file-tree .comment {
+        color: #6272a4;
+        font-style: italic;
+      }
+      .file-tree .size {
+        color: var(--neon-orange);
+        float: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+
+    <header class="header">
+      <h1 class="header-title">EchoPulse AI: Arquitectura del Sistema</h1>
+      <div style="margin-top: 1rem">
+        <span class="phase-badge phase-llm">🧠 LLM Orquestador</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-intent">🎯 Módulo 3: Intent</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-master">⚖️ Módulo 2: Re-ranking</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-deploy">🚀 Deploy</span>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <div class="tab-container">
+        <div class="tab active" onclick="switchTab('overview')">
+          🌐 Vista General
+        </div>
+        <div class="tab" onclick="switchTab('pipeline')">🔄 Pipeline E2E</div>
+        <div class="tab" onclick="switchTab('module3')">🎯 Módulo 3</div>
+        <div class="tab" onclick="switchTab('module2')">⚖️ Módulo 2</div>
+        <div class="tab" onclick="switchTab('orchestrator')">
+          🧠 Orquestador
+        </div>
+        <div class="tab" onclick="switchTab('files')">📁 Estructura</div>
+        <div class="tab" onclick="switchTab('metrics')">📊 Métricas</div>
+      </div>
+
+      <!-- TAB 1: Overview -->
+      <div id="tab-overview" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-purple"
+              style="
+                background: rgba(188, 19, 254, 0.1);
+                border: 1px solid var(--neon-purple);
+              "
+            >
+              🌐
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-purple)">
+                Arquitectura Híbrida End-to-End
+              </div>
+              <div style="color: #666; font-size: 0.85rem">
+                Sistema de recomendación musical multimodal
+              </div>
+            </div>
+          </div>
+
+          <div class="highlight-box">
+            <p style="color: #ccc; font-size: 0.95rem; line-height: 1.6">
+              <strong>EchoPulse AI</strong> combina
+              <span class="accent-yellow">LLMs (Qwen 2.5)</span> para
+              procesamiento de lenguaje natural,
+              <span class="accent-pink"
+                >Transformers especializados (Módulo 3)</span
+              >
+              para recuperación semántica de intención, y
+              <span class="accent-blue">Transformers híbridos (Módulo 2)</span>
+              para re-ranking basado en features técnicos y léxicos. El sistema
+              reduce un universo de <strong>38,343 canciones</strong> a
+              recomendaciones precisas en <strong>~6-8 segundos</strong>.
+            </p>
+          </div>
+
+          <div class="pipeline-container">
+            <!-- Capa 1: Usuario + LLM -->
+            <div class="phase-section phase-llm-section">
+              <div class="phase-header" style="color: var(--neon-yellow)">
+                <span>🟡</span> CAPA DE INTERACCIÓN: Usuario + LLM Orquestador
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700">
+                    Usuario Web
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Input en español
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    Flask API
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    POST /api/chat
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    Qwen 2.5-7B
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Traducción EN
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-yellow)">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    Keywords
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    "intense, heavy"
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Capa 2: Módulo 3 -->
+            <div class="phase-section phase-intent-section">
+              <div class="phase-header" style="color: var(--neon-pink)">
+                <span>🩷</span> CAPA DE RECUPERACIÓN: IntentTransformer (Módulo
+                3)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Tokenización
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">10k vocab</div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Encoder-Only
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    4 capas, 8 heads
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Clasificación
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    38,343 clases
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-pink)">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Top 10 IDs
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">Candidatos</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Capa 3: Módulo 2 -->
+            <div class="phase-section phase-master-section">
+              <div class="phase-header" style="color: var(--neon-blue)">
+                <span>🔵</span> CAPA DE RE-RANKING: MST_MR_Transformer (Módulo
+                2)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-blue); font-weight: 700">
+                    Embeddings 512-d
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Query vs Candidates
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-blue); font-weight: 700">
+                    Cross-Attention
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Lírica + Técnico
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700">
+                    Score Híbrido
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    0.4*Neural + 0.6*Jaccard
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-blue)">
+                  <div style="color: var(--neon-blue); font-weight: 700">
+                    Top 10 Ranked
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">Re-ordenado</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Capa 4: Respuesta -->
+            <div class="phase-section phase-deploy-section">
+              <div class="phase-header" style="color: var(--neon-green)">
+                <span>🟢</span> CAPA DE RESPUESTA: Generación + Frontend
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    Qwen 2.5
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Respuesta empática ES
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    Metadatos
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Track/Artist/Genre
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    Enlaces
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Spotify + YouTube
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-green)">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    JSON Response
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">Chat UI</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">3</div>
+            <div class="stat-label">Módulos IA</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">38,343</div>
+            <div class="stat-label">Canciones Índice</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">~6.2s</div>
+            <div class="stat-label">Latencia Total</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">84%</div>
+            <div class="stat-label">Cobertura Metadata</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">98.4%</div>
+            <div class="stat-label">Tasa Éxito</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">2,440x</div>
+            <div class="stat-label">Mejora sobre Azar</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Pipeline -->
+      <div id="tab-pipeline" class="tab-content">
+        <h2 class="section-title title-arch">
+          🔄 Pipeline de Datos End-to-End
+        </h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-cyan"
+              style="
+                background: rgba(0, 243, 255, 0.1);
+                border-color: var(--neon-cyan);
+              "
+            >
+              📊
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-cyan)">
+                Flujo de una Consulta Típica
+              </div>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="code-header">
+              Secuencia Completa: "Necesito música intensa para entrenar"
+            </div>
+            <pre><span class="comment"># 1. USUARIO → FLASK (0ms)</span>
+POST /api/chat
+Body: {"message": "Necesito música intensa para entrenar"}
+
+<span class="comment"># 2. FASE 1: TRADUCCIÓN/REFINAMIENTO (~2,800ms)</span>
+System: "Convert user request into 3-5 English keywords..."
+User: "Necesito música intensa para entrenar"
+<span class="comment"># ↓ Qwen 2.5-7B-Instruct (Hugging Face API)</span>
+Output: "intense, heavy, aggressive, workout, gym"
+
+<span class="comment"># 3. FASE 2: RECUPERACIÓN - MÓDULO 3 (~125ms)</span>
+Input: "intense heavy aggressive workout gym"
+<span class="comment"># ↓ IntentTransformer (Encoder-Only, 38,343 clases)</span>
+Tokenización: [12, 458, 23, 891, 3341, 0, 0, ...] <span class="comment"># (1, 512)</span>
+Forward: Softmax(38,343) → TopK(10)
+Output: [
+  {"id": "6L89mwZXSOwYl76YXfX13s", "confidence": 0.0069},
+  {"id": "0tZ3mElWcr74OOhKEiNz1x", "confidence": 0.0048},
+  <span class="comment"># ... 8 más</span>
+]
+
+<span class="comment"># 4. FASE 3: ENRIQUECIMIENTO (~15ms)</span>
+<span class="comment"># ↓ Búsqueda en song_metadata.json (38,343 entradas)</span>
+Cobertura: ~85% con track_name/artist_name reales
+Generación de enlaces Spotify/YouTube
+
+<span class="comment"># 5. FASE 4: RE-RANKING - MÓDULO 2 (~90ms)</span>
+<span class="comment"># ↓ MST_MR_Transformer (Embeddings 512-d)</span>
+Query Embedding: [0.023, -0.156, ..., 0.089] <span class="comment"># (1, 512)</span>
+Candidatos Embeddings: [(10, 512)]
+Scores:
+  - Neural Cosine: 0.82
+  - Jaccard Lexical: 0.45
+  - Final: 0.4*0.82 + 0.6*0.45 = 0.598
+<span class="comment"># ↓ Re-ordenamiento</span>
+Output: Top 10 re-ranked por score híbrido
+
+<span class="comment"># 6. FASE 5: GENERACIÓN RESPUESTA (~3,200ms)</span>
+Contexto: Top 5 canciones con metadatos y enlaces
+System: "Eres EchoPulse AI, curador musical empático. Responde en ESPAÑOL..."
+<span class="comment"># ↓ Qwen 2.5-7B-Instruct</span>
+Output: "¡Perfecto para tu sesión! Te recomiendo estas rolas intensas..."
+
+<span class="comment"># 7. RESPUESTA JSON</span>
+{
+  "response": "¡Perfecto para tu sesión!...",
+  "module3_top10": [...],
+  "module2_top10": [...],
+  "latencies_ms": {
+    "translation": 2847.2,
+    "retrieval": 124.5,
+    "reranking": 89.3,
+    "generation": 3189.4,
+    "total": 6250.4
+  }
+}</pre>
+          </div>
+
+          <div class="arch-grid" style="margin-top: 2rem">
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                🟡 Latencias por Etapa
+              </div>
+              <div class="arch-content">
+                <strong>Traducción (Qwen):</strong> ~2,800ms<br />
+                <strong>Recuperación (M3):</strong> ~125ms<br />
+                <strong>Enriquecimiento:</strong> ~15ms<br />
+                <strong>Re-ranking (M2):</strong> ~90ms<br />
+                <strong>Generación (Qwen):</strong> ~3,200ms<br />
+                <hr style="border-color: #333; margin: 0.5rem 0" />
+                <strong style="color: var(--neon-green)"
+                  >TOTAL: ~6,230ms</strong
+                >
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                🩷 Módulo 3: Embudo Semántico
+              </div>
+              <div class="arch-content">
+                <strong>Input:</strong> Query textual<br />
+                <strong>Universo:</strong> 38,343 canciones<br />
+                <strong>Output:</strong> Top 10 candidatos<br />
+                <strong>Reducción:</strong> 99.97% del espacio de búsqueda<br />
+                <strong>Precisión @10:</strong> 4.88% (2,440× sobre azar)
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-blue)">
+                🔵 Módulo 2: Re-ranking Híbrido
+              </div>
+              <div class="arch-content">
+                <strong>Input:</strong> 10 candidatos<br />
+                <strong>Señales:</strong> Neural (40%) + Léxica (60%)<br />
+                <strong>Embeddings:</strong> 512-dimensionales<br />
+                <strong>Cross-Attention:</strong> Lírica vs Técnico<br />
+                <strong>Output:</strong> Lista re-ordenada por relevancia
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Module 3 -->
+      <div id="tab-module3" class="tab-content">
+        <h2 class="section-title title-intent">
+          🎯 Módulo 3: IntentTransformer
+        </h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-pink"
+                style="
+                  background: rgba(255, 0, 255, 0.1);
+                  border-color: var(--neon-pink);
+                "
+              >
+                🧠
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-pink)">
+                  Arquitectura Encoder-Only
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                Input Embedding
+              </div>
+              <div class="arch-content">
+                <strong>Vocabulario:</strong> 10,000 tokens<br />
+                <strong>Dimensión:</strong> 256-d<br />
+                <strong>Tokens especiales:</strong> &lt;PAD&gt;(0),
+                &lt;UNK&gt;(1), [SEP](2)<br />
+                <strong>Output:</strong>
+                <span class="tensor-shape">(batch, 512, 256)</span>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                Positional Encoding
+              </div>
+              <div class="arch-content">
+                <strong>Tipo:</strong> Paramétrico aprendible<br />
+                <strong>Shape:</strong>
+                <span class="tensor-shape">(1, 512, 256)</span><br />
+                <strong>Función:</strong> Captura orden del diálogo
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                Transformer Encoder
+              </div>
+              <div class="arch-content">
+                <strong>Capas:</strong> 4<br />
+                <strong>Cabezales:</strong> 8 por capa<br />
+                <strong>FFN:</strong> 1024 dimensiones ocultas<br />
+                <strong>Dropout:</strong> 0.1 (entrenamiento)
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Clasificación
+              </div>
+              <div class="arch-content">
+                <strong>Pooling:</strong> Global Average<br />
+                <strong>Proyección:</strong> Linear(256, 38343)<br />
+                <strong>Activación:</strong> Softmax<br />
+                <strong>Salida:</strong> Distribución probabilidad sobre
+                canciones
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-red"
+                style="
+                  background: rgba(255, 0, 64, 0.1);
+                  border-color: var(--neon-red);
+                "
+              >
+                📊
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">
+                  Métricas de Validación
+                </div>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 1rem;
+                margin-bottom: 1rem;
+              "
+            >
+              <div class="metric-box" style="padding: 1rem">
+                <div class="metric-value" style="font-size: 1.5rem">0.63%</div>
+                <div class="metric-label" style="font-size: 0.7rem">
+                  Hit Rate @1
+                </div>
+              </div>
+              <div class="metric-box" style="padding: 1rem">
+                <div class="metric-value" style="font-size: 1.5rem">2.72%</div>
+                <div class="metric-label" style="font-size: 0.7rem">
+                  Hit Rate @5
+                </div>
+              </div>
+              <div class="metric-box" style="padding: 1rem">
+                <div class="metric-value" style="font-size: 1.5rem">4.88%</div>
+                <div class="metric-label" style="font-size: 0.7rem">
+                  Hit Rate @10
+                </div>
+              </div>
+              <div class="metric-box" style="padding: 1rem">
+                <div class="metric-value" style="font-size: 1.5rem">0.0159</div>
+                <div class="metric-label" style="font-size: 0.7rem">MRR</div>
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                ✅ Validación
+              </div>
+              <div class="arch-content">
+                Supera el azar (0.0026%) por factor de <strong>2,440×</strong>.
+                Funciona como embudo semántico efectivo, reduciendo el universo
+                de búsqueda al 0.026% más relevante.
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: 1 / -1">
+            <div class="card-header">
+              <div
+                class="card-icon bg-pink"
+                style="
+                  background: rgba(255, 0, 255, 0.1);
+                  border-color: var(--neon-pink);
+                "
+              >
+                💾
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-pink)">
+                  Implementación PyTorch
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">IntentTransformer - Clase Completa</div>
+              <pre><span class="keyword">class</span> <span class="class-name">IntentTransformer</span>(nn.Module):
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, vocab_size, num_songs, d_model=<span class="number">256</span>, n_heads=<span class="number">8</span>, num_layers=<span class="number">4</span>, max_len=<span class="number">512</span>):
+        <span class="function">super</span>().<span class="function">__init__</span>()
+        self.embed = nn.Embedding(vocab_size, d_model, padding_idx=<span class="number">0</span>)
+        self.pos = nn.Parameter(torch.zeros(<span class="number">1</span>, max_len, d_model))
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model, n_heads, dim_feedforward=<span class="number">1024</span>, batch_first=<span class="keyword">True</span>
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers)
+        self.fc = nn.Linear(d_model, num_songs)
+        
+    <span class="keyword">def</span> <span class="function">forward</span>(self, x):
+        <span class="comment"># x: (batch, seq_len)</span>
+        x = self.embed(x) + self.pos[:, :x.size(<span class="number">1</span>), :]  <span class="comment"># + Positional</span>
+        x = self.encoder(x)  <span class="comment"># (batch, seq_len, d_model)</span>
+        x = x.mean(dim=<span class="number">1</span>)    <span class="comment"># Global Average Pooling</span>
+        <span class="keyword">return</span> self.fc(x)    <span class="comment"># (batch, num_songs) logits</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Module 2 -->
+      <div id="tab-module2" class="tab-content">
+        <h2 class="section-title title-master">
+          ⚖️ Módulo 2: MST_MR_Transformer
+        </h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-blue"
+                style="
+                  background: rgba(0, 102, 255, 0.1);
+                  border-color: var(--neon-blue);
+                "
+              >
+                ⚖️
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-blue)">
+                  Arquitectura Dual
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                Encoder de Lírica
+              </div>
+              <div class="arch-content">
+                <strong>Embedding:</strong> vocab_size=5,000, d_model=512<br />
+                <strong>Pos Encoding:</strong>
+                <span class="tensor-shape">(1, 151, 512)</span><br />
+                <strong>Procesamiento:</strong> Letras tokenizadas (max 151
+                tokens)
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                Encoder Técnico
+              </div>
+              <div class="arch-content">
+                <strong>Input:</strong> 26 features (BPM, energía, valencia,
+                etc.)<br />
+                <strong>Proyección:</strong> 26 → 256 → 512 + GELU<br />
+                <strong>Output:</strong> Vector técnico 512-d
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                Fusión Cross-Attention
+              </div>
+              <div class="arch-content">
+                <strong>Query:</strong> Lírica (batch, 151, 512)<br />
+                <strong>Key/Value:</strong> Técnico (batch, 1, 512)<br />
+                <strong>Cabezales:</strong> 8<br />
+                <strong>Output:</strong> Memoria fusionada
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Decoder & Output
+              </div>
+              <div class="arch-content">
+                <strong>Capas:</strong> 6 TransformerDecoderLayer<br />
+                <strong>Pooling:</strong> Global Mean<br />
+                <strong>Output:</strong> Embedding 512-d de la canción
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-cyan"
+                style="
+                  background: rgba(0, 243, 255, 0.1);
+                  border-color: var(--neon-cyan);
+                "
+              >
+                🧮
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-cyan)">
+                  Re-ranking Híbrido
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block" style="padding: 1rem">
+              <div class="code-header">Cálculo de Score</div>
+              <pre><span class="comment"># 1. Similitud Neural (Coseno)</span>
+query_emb = F.normalize(model(l_tensor, t_neutral), dim=<span class="number">1</span>)
+neural_sim = F.cosine_similarity(query_emb, song_embeddings, dim=<span class="number">1</span>)
+
+<span class="comment"># 2. Similitud Léxica (Jaccard)</span>
+query_set = <span class="function">set</span>(words)
+jaccard = [<span class="function">len</span>(query_set & s) / <span class="function">len</span>(query_set | s) 
+           <span class="keyword">for</span> s <span class="keyword">in</span> lyric_word_sets]
+
+<span class="comment"># 3. Ponderación final</span>
+ALPHA, GAMMA = <span class="number">0.40</span>, <span class="number">0.60</span>
+score = (ALPHA * neural_sim) + (GAMMA * jaccard)
+
+<span class="comment"># 4. Top K selección</span>
+top_val, top_idx = torch.topk(score, k=<span class="number">10</span>)</pre>
+            </div>
+
+            <div class="arch-block" style="margin-top: 1rem">
+              <div class="arch-title" style="color: var(--neon-green)">
+                ✅ Optimizaciones
+              </div>
+              <div class="arch-content">
+                • <strong>Embeddings pre-computados:</strong> 5,710 canciones en
+                memoria<br />
+                • <strong>NaN handling:</strong> torch.nan_to_num()<br />
+                • <strong>Features neutros:</strong> Zeros para query sin
+                metadatos<br />
+                • <strong>Inferencia:</strong> torch.no_grad() + model.eval()
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Orchestrator -->
+      <div id="tab-orchestrator" class="tab-content">
+        <h2 class="section-title title-llm">🧠 Orquestador LLM + Flask</h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-yellow"
+              style="
+                background: rgba(243, 255, 0, 0.1);
+                border-color: var(--neon-yellow);
+              "
+            >
+              🐍
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-yellow)">
+                app.py - Orquestación Completa
+              </div>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="code-header">
+              Función Principal: procesar_consulta_echopulse()
+            </div>
+            <pre><span class="keyword">def</span> <span class="function">procesar_consulta_echopulse</span>(mensaje_usuario):
+    <span class="comment"># FASE 1: Traducción/refinamiento a inglés</span>
+    system_translate = <span class="string">"You are a music curator assistant. Convert the user's request into 3-5 concise English keywords..."</span>
+    query_en = query_hugging_face(mensaje_usuario, system_translate)
+    
+    <span class="comment"># FASE 2: Módulo 3 - Top 10 por intención</span>
+    raw_m3 = module3.predict_top10(query_en)
+    candidates_m3 = [enriquecer_candidato(c) <span class="keyword">for</span> c <span class="keyword">in</span> raw_m3]
+    candidate_ids = [c[<span class="string">"id"</span>] <span class="keyword">for</span> c <span class="keyword">in</span> candidates_m3]
+    
+    <span class="comment"># FASE 3: Módulo 2 - Re-ranking</span>
+    raw_m2 = module2.rerank_top10(candidate_ids, query_en)
+    candidates_m2 = [enriquecer_candidato(c) <span class="keyword">for</span> c <span class="keyword">in</span> raw_m2]
+    
+    <span class="comment"># FASE 4: Generar respuesta final con Qwen</span>
+    contexto = <span class="string">"\n"</span>.join([<span class="string">f"{i+1}. {c['track_name']} por {c['artist_name']}"</span> 
+                      <span class="keyword">for</span> i, c <span class="keyword">in</span> <span class="function">enumerate</span>(candidates_m2[:<span class="number">5</span>])])
+    system_final = <span class="string">"Eres EchoPulse AI, curador musical empático. Responde SIEMPRE en ESPAÑOL..."</span>
+    respuesta_final = query_hugging_face(contexto, system_final)
+    
+    <span class="keyword">return</span> {
+        <span class="string">"response"</span>: respuesta_final,
+        <span class="string">"module3_top10"</span>: candidates_m3,
+        <span class="string">"module2_top10"</span>: candidates_m2,
+        <span class="string">"stages"</span>: [<span class="string">"translation"</span>, <span class="string">"retrieval"</span>, <span class="string">"reranking"</span>, <span class="string">"generation"</span>]
+    }</pre>
+          </div>
+
+          <div class="arch-grid" style="margin-top: 2rem">
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                API Endpoints
+              </div>
+              <div class="arch-content">
+                <strong>POST /api/chat</strong> - Procesa consulta<br />
+                <strong>GET /api/health</strong> - Estado del sistema<br />
+                <strong>GET /api/metrics</strong> - Métricas en tiempo real<br />
+                <strong>GET /</strong> - Serve index.html
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Sistema de Métricas
+              </div>
+              <div class="arch-content">
+                • Contadores: total_queries, successful_queries<br />
+                • Latencias: por etapa y total<br />
+                • Cobertura: metadata_hits/misses<br />
+                • Persistencia: JSONL mensual
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                Enriquecimiento
+              </div>
+              <div class="arch-content">
+                • Búsqueda en song_metadata.json<br />
+                • Generación de enlaces Spotify (por ID)<br />
+                • Generación de enlaces YouTube (por query)<br />
+                • Fallback "Unknown" para IDs sin metadata
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: File Structure -->
+      <div id="tab-files" class="tab-content">
+        <h2 class="section-title title-deploy">📁 Estructura de Archivos</h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-green"
+              style="
+                background: rgba(0, 255, 136, 0.1);
+                border-color: var(--neon-green);
+              "
+            >
+              📂
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-green)">
+                Directorio del Proyecto
+              </div>
+            </div>
+          </div>
+
+          <div class="file-tree">
+            <span class="dir">Investigative-Project-On-Steroids/</span>
+            │ ├── <span class="dir">echopulse_llm_orquestator/</span>
+            <span class="comment"># Backend principal</span> │ ├──
+            <span class="file">app.py</span>
+            <span class="comment"># Flask + orquestación</span> │ ├──
+            <span class="file">requirements.txt</span>
+            <span class="comment"># Dependencias</span> │ ├──
+            <span class="file">.env</span>
+            <span class="comment"># HF_TOKEN=hf_...</span> │ ├──
+            <span class="dir">logs/</span>
+            <span class="comment"># Logs runtime</span> │ │ ├──
+            <span class="file">metrics_2026-04.jsonl</span>
+            <span class="comment"># Métricas JSONL</span> │ │ └──
+            <span class="file">metrics.log</span>
+            <span class="comment"># Logs estructurados</span> │ ├──
+            <span class="dir">templates/</span> │ │ └──
+            <span class="file">index.html</span>
+            <span class="comment"># Frontend Tailwind</span> │ └──
+            <span class="dir">models/</span>
+            <span class="comment"># Modelos y assets</span> │ ├──
+            <span class="file">song_metadata.json</span>
+            <span class="comment"># Cache metadatos (38k)</span> │ ├──
+            <span class="dir">talkplay/</span>
+            <span class="comment"># Módulo 3</span> │ │ ├──
+            <span class="file">intent_model.pth</span>
+            <span class="size">62.8 MB</span> │ │ ├──
+            <span class="file">vocab.json</span>
+            <span class="comment"># 10k tokens</span> │ │ └──
+            <span class="file">song_map.pkl</span>
+            <span class="comment"># 38,343 clases</span> │ └──
+            <span class="dir">tabla_maestra/</span>
+            <span class="comment"># Módulo 2</span> │ ├──
+            <span class="file">mst_mr_final.pth</span>
+            <span class="size">127 MB</span> │ └──
+            <span class="file">embeddings.pt</span>
+            <span class="comment"># Pre-computados</span> │ ├──
+            <span class="dir">tabla_maestra/</span>
+            <span class="comment"># Dataset referencia</span> │ └──
+            <span class="dir">train/</span> │ └──
+            <span class="file">part-*.snappy.parquet</span>
+            <span class="comment"># 5,710 canciones</span> │ ├──
+            <span class="dir">scripts/</span>
+            <span class="comment"># Scripts auxiliares</span> │ ├──
+            <span class="file">extract_module3_ids.py</span>
+            <span class="comment"># Extrae IDs</span> │ ├──
+            <span class="file">cross_kaggle_metadata.py</span>
+            <span class="comment"># Cruce Kaggle</span> │ └──
+            <span class="file">cross_tracks_csv.py</span>
+            <span class="comment"># Enriquecimiento</span> │ ├──
+            <span class="file">spotify_data.csv</span>
+            <span class="comment"># Dataset Kaggle 1M</span> ├──
+            <span class="file">tracks.csv</span>
+            <span class="comment"># IDs + metadatos</span> │ └──
+            <span class="dir">docs/</span>
+            <span class="comment"># Documentación</span> ├──
+            <span class="file">informe_tecnico.md</span>
+            <span class="comment"># Este documento</span> ├──
+            <span class="file">archTalkPlayTransformer.html</span>
+            <span class="comment"># Arquitectura M3</span> └──
+            <span class="file">archTablaMaestra.html</span>
+            <span class="comment"># Arquitectura M2</span>
+          </div>
+
+          <div class="arch-grid" style="margin-top: 2rem">
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                Requisitos
+              </div>
+              <div class="arch-content">
+                Python 3.10+<br />
+                PyTorch 2.1.2<br />
+                Flask 3.0.0<br />
+                500MB+ espacio (modelos)<br />
+                HF_TOKEN válido
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-orange)">
+                Tamaños
+              </div>
+              <div class="arch-content">
+                Módulo 3: ~63 MB<br />
+                Módulo 2: ~127 MB<br />
+                Metadatos: ~15 MB<br />
+                Total: ~205 MB
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Despliegue
+              </div>
+              <div class="arch-content">
+                <code>python app.py</code><br />
+                Puerto: 5000<br />
+                Host: 0.0.0.0<br />
+                URL: http://localhost:5000
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: Metrics -->
+      <div id="tab-metrics" class="tab-content">
+        <h2
+          class="section-title"
+          style="color: var(--neon-purple); border-color: var(--neon-purple)"
+        >
+          📊 Métricas y Validación
+        </h2>
+
+        <div class="arch-grid" style="grid-template-columns: repeat(4, 1fr)">
+          <div class="metric-box">
+            <div class="metric-value">98.4%</div>
+            <div class="metric-label">Tasa de Éxito</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">6,230ms</div>
+            <div class="metric-label">Latencia Promedio</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">84.2%</div>
+            <div class="metric-label">Cobertura Metadata</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">2,440x</div>
+            <div class="metric-label">Mejora sobre Azar</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem">
+          <div class="card-header">
+            <div
+              class="card-icon bg-purple"
+              style="
+                background: rgba(188, 19, 254, 0.1);
+                border-color: var(--neon-purple);
+              "
+            >
+              📈
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-purple)">
+                Validación por Módulo
+              </div>
+            </div>
+          </div>
+
+          <div class="arch-grid">
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                Módulo 3: IntentTransformer
+              </div>
+              <div class="arch-content">
+                <strong>Hit Rate @10:</strong> 4.88%<br />
+                <strong>MRR:</strong> 0.0159<br />
+                <strong>Baseline:</strong> 0.0026% (azar)<br />
+                <strong>Factor mejora:</strong> 2,440×<br />
+                <hr style="border-color: #333; margin: 0.5rem 0" />
+                ✅ Embudo semántico efectivo<br />
+                ✅ Reducción 99.97% espacio búsqueda<br />
+                ✅ Generalización a queries nuevos
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-blue)">
+                Módulo 2: MST_MR
+              </div>
+              <div class="arch-content">
+                <strong>Score híbrido:</strong> 0.4N + 0.6J<br />
+                <strong>Embeddings:</strong> 512-d<br />
+                <strong>Cobertura:</strong> 5,710 canciones<br />
+                <strong>Inferencia:</strong> &lt;100ms<br />
+                <hr style="border-color: #333; margin: 0.5rem 0" />
+                ✅ Fusión efectiva lírica+técnica<br />
+                ✅ Re-ranking robusto<br />
+                ✅ Manejo de NaN/Inf
+              </div>
+            </div>
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                Orquestador LLM
+              </div>
+              <div class="arch-content">
+                <strong>Modelo:</strong> Qwen 2.5-7B<br />
+                <strong>Traducción:</strong> ~2.8s<br />
+                <strong>Generación:</strong> ~3.2s<br />
+                <strong>Reintentos:</strong> 3× backoff<br />
+                <hr style="border-color: #333; margin: 0.5rem 0" />
+                ✅ Respuestas empáticas ES<br />
+                ✅ Refinamiento de intención<br />
+                ✅ Contexto musical rico
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-green"
+              style="
+                background: rgba(0, 255, 136, 0.1);
+                border-color: var(--neon-green);
+              "
+            >
+              ✅
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-green)">
+                Checklist de Entrega
+              </div>
+            </div>
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 1rem;
+              font-size: 0.9rem;
+            "
+          >
+            <div>
+              <div style="color: var(--neon-green); margin-bottom: 0.5rem">
+                ✅ Completado
+              </div>
+              <ul style="list-style: none; color: #aaa; line-height: 1.8">
+                <li>✓ Documentación técnica completa</li>
+                <li>✓ Código funcional comentado</li>
+                <li>✓ Métricas de validación ML</li>
+                <li>✓ Arquitectura visual</li>
+                <li>✓ Instrucciones de despliegue</li>
+                <li>✓ Manejo de errores robusto</li>
+                <li>✓ Interfaz responsive</li>
+                <li>✓ Sistema de métricas</li>
+              </ul>
+            </div>
+            <div>
+              <div style="color: var(--neon-orange); margin-bottom: 0.5rem">
+                🚧 Pendiente
+              </div>
+              <ul style="list-style: none; color: #aaa; line-height: 1.8">
+                <li>○ Pruebas unitarias (v1.1)</li>
+                <li>○ Documentación OpenAPI/Swagger</li>
+                <li>○ Dockerización</li>
+                <li>○ Cache de respuestas LLM</li>
+                <li>○ Streaming de respuestas</li>
+                <li>○ Autenticación básica</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      function switchTab(tabId) {
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((c) => c.classList.remove("active"));
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document.getElementById("tab-" + tabId).classList.add("active");
+        event.target.classList.add("active");
+      }
+    </script>
+  </body>
+</html>

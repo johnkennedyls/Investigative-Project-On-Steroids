@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoPulse AI: Módulo 3 - Arquitectura TalkPlay Transformer</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --neon-cyan: #00f3ff;
+        --neon-pink: #ff00ff;
+        --neon-purple: #bc13fe;
+        --neon-yellow: #f3ff00;
+        --neon-orange: #ff6600;
+        --neon-green: #00ff88;
+        --neon-blue: #0066ff;
+        --neon-red: #ff0040;
+        --bg-dark: #030308;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: var(--bg-dark);
+        color: #e0e0e0;
+        font-family: "Inter", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        line-height: 1.6;
+      }
+
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .bg-grid {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image:
+          linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        z-index: -1;
+      }
+
+      .header {
+        background: rgba(5, 5, 16, 0.95);
+        border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        padding: 1.5rem;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .header-title {
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
+        font-weight: 800;
+        background: linear-gradient(
+          90deg,
+          #fff,
+          var(--neon-pink),
+          var(--neon-purple)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .phase-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-right: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .phase-train {
+        background: rgba(255, 0, 64, 0.2);
+        color: var(--neon-red);
+        border: 1px solid var(--neon-red);
+      }
+      .phase-deploy {
+        background: rgba(0, 102, 255, 0.2);
+        color: var(--neon-blue);
+        border: 1px solid var(--neon-blue);
+      }
+      .phase-runtime {
+        background: rgba(0, 255, 136, 0.2);
+        color: var(--neon-green);
+        border: 1px solid var(--neon-green);
+      }
+
+      .main-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin: 2rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid;
+      }
+
+      .title-train {
+        color: var(--neon-red);
+        border-color: var(--neon-red);
+      }
+      .title-deploy {
+        color: var(--neon-blue);
+        border-color: var(--neon-blue);
+      }
+      .title-runtime {
+        color: var(--neon-green);
+        border-color: var(--neon-green);
+      }
+      .title-arch {
+        color: var(--neon-purple);
+        border-color: var(--neon-purple);
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        flex-shrink: 0;
+      }
+
+      .card-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .code-block {
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 12px;
+        padding: 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .code-header {
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+      }
+
+      .keyword {
+        color: #ff79c6;
+      }
+      .string {
+        color: #f1fa8c;
+      }
+      .function {
+        color: #50fa7b;
+      }
+      .comment {
+        color: #6272a4;
+      }
+      .number {
+        color: #bd93f9;
+      }
+      .class-name {
+        color: #8be9fd;
+      }
+
+      .arch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .arch-block {
+        background: rgba(10, 10, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 1.25rem;
+      }
+
+      .arch-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .arch-content {
+        font-size: 0.85rem;
+        color: #aaa;
+        line-height: 1.5;
+      }
+
+      .tensor-shape {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--neon-cyan);
+        font-size: 0.8rem;
+        background: rgba(0, 243, 255, 0.1);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        display: inline-block;
+        margin: 0.25rem 0;
+      }
+
+      .metric-box {
+        background: rgba(10, 10, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.2s;
+      }
+
+      .metric-box:hover {
+        transform: translateY(-5px);
+        border-color: var(--neon-purple);
+      }
+
+      .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--neon-purple);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .metric-label {
+        font-size: 0.85rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 0.5rem;
+      }
+
+      .fix-box {
+        background: rgba(255, 0, 64, 0.1);
+        border-left: 4px solid var(--neon-red);
+        border-radius: 0 12px 12px 0;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+
+      .fix-title {
+        color: var(--neon-red);
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+      }
+
+      .tab-container {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #888;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .tab:hover,
+      .tab.active {
+        background: var(--neon-pink);
+        color: #000;
+        border-color: var(--neon-pink);
+      }
+
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .pipeline-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .phase-section {
+        border: 2px solid;
+        border-radius: 16px;
+        padding: 1.5rem;
+        position: relative;
+      }
+
+      .phase-train-section {
+        border-color: var(--neon-red);
+        background: rgba(255, 0, 64, 0.05);
+      }
+      .phase-deploy-section {
+        border-color: var(--neon-blue);
+        background: rgba(0, 102, 255, 0.05);
+      }
+      .phase-runtime-section {
+        border-color: var(--neon-green);
+        background: rgba(0, 255, 136, 0.05);
+      }
+
+      .phase-header {
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .flow-item {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        position: relative;
+      }
+
+      .flow-arrow-down {
+        text-align: center;
+        font-size: 1.5rem;
+        color: var(--neon-cyan);
+        margin: 0.5rem 0;
+      }
+
+      .accent-cyan {
+        color: var(--neon-cyan);
+      }
+      .accent-pink {
+        color: var(--neon-pink);
+      }
+      .accent-purple {
+        color: var(--neon-purple);
+      }
+      .accent-yellow {
+        color: var(--neon-yellow);
+      }
+      .accent-green {
+        color: var(--neon-green);
+      }
+      .accent-orange {
+        color: var(--neon-orange);
+      }
+      .accent-red {
+        color: var(--neon-red);
+      }
+      .accent-blue {
+        color: var(--neon-blue);
+      }
+
+      .bg-cyan {
+        background: rgba(0, 243, 255, 0.1);
+        border-color: var(--neon-cyan);
+      }
+      .bg-pink {
+        background: rgba(255, 0, 255, 0.1);
+        border-color: var(--neon-pink);
+      }
+      .bg-purple {
+        background: rgba(188, 19, 254, 0.1);
+        border-color: var(--neon-purple);
+      }
+      .bg-yellow {
+        background: rgba(243, 255, 0, 0.1);
+        border-color: var(--neon-yellow);
+      }
+      .bg-green {
+        background: rgba(0, 255, 136, 0.1);
+        border-color: var(--neon-green);
+      }
+      .bg-orange {
+        background: rgba(255, 102, 0, 0.1);
+        border-color: var(--neon-orange);
+      }
+      .bg-red {
+        background: rgba(255, 0, 64, 0.1);
+        border-color: var(--neon-red);
+      }
+
+      .highlight-box {
+        background: linear-gradient(
+          135deg,
+          rgba(188, 19, 254, 0.1),
+          rgba(0, 243, 255, 0.1)
+        );
+        border: 1px solid rgba(188, 19, 254, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .stat-item {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--neon-cyan);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+
+    <header class="header">
+      <h1 class="header-title">
+        EchoPulse AI: Módulo 3 - TalkPlay Transformer
+      </h1>
+      <div style="margin-top: 1rem">
+        <span class="phase-badge phase-train">1. Entrenamiento Offline</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-deploy">2. Deployment</span>
+        <span style="color: #666">→</span>
+        <span class="phase-badge phase-runtime">3. Runtime Inference</span>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <div class="tab-container">
+        <div class="tab active" onclick="switchTab('overview')">
+          🎯 Vista General
+        </div>
+        <div class="tab" onclick="switchTab('architecture')">
+          🏗️ Arquitectura
+        </div>
+        <div class="tab" onclick="switchTab('training')">🔥 Entrenamiento</div>
+        <div class="tab" onclick="switchTab('deployment')">📦 Deployment</div>
+        <div class="tab" onclick="switchTab('inference')">⚡ Inferencia</div>
+        <div class="tab" onclick="switchTab('metrics')">📊 Métricas</div>
+      </div>
+
+      <!-- TAB 1: Overview -->
+      <div id="tab-overview" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-purple"
+              style="
+                background: rgba(188, 19, 254, 0.1);
+                border: 1px solid var(--neon-purple);
+              "
+            >
+              🧠
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-purple)">
+                Módulo 3: Motor de Intención Conversacional
+              </div>
+              <div style="color: #666; font-size: 0.85rem">
+                Transformer Encoder-Only para clasificación de intención musical
+              </div>
+            </div>
+          </div>
+
+          <div class="highlight-box">
+            <p style="color: #ccc; font-size: 0.95rem; line-height: 1.6">
+              El <strong>TalkPlay Transformer</strong> es un modelo de
+              inteligencia artificial basado en la arquitectura Transformer que
+              procesa secuencias de diálogo para predecir la canción más
+              relevante según la intención del usuario. Funciona como un sistema
+              de
+              <span class="accent-purple"
+                >recuperación semántica (Retrieval)</span
+              >, reduciendo un universo de <strong>38,343 canciones</strong> a
+              un top-10 de candidatos de alta calidad para el posterior
+              re-ranking del Módulo 2 (Tabla Maestra).
+            </p>
+          </div>
+
+          <div class="pipeline-container">
+            <!-- Fase 1 -->
+            <div class="phase-section phase-train-section">
+              <div class="phase-header" style="color: var(--neon-red)">
+                <span>🔴</span> FASE 1: ENTRENAMIENTO (Google Colab)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    TalkPlayData-2
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    ~16,000 diálogos
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700">
+                    ETL Manual
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Procesamiento de turnos
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Tokenizer
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    10k vocabulario
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    IntentTransformer
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    d_model=256, 4 capas
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-red)">
+                  <div style="color: var(--neon-red); font-weight: 700">
+                    intent_model.pth
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    + vocab.json + song_map.pkl
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Fase 2 -->
+            <div class="phase-section phase-deploy-section">
+              <div class="phase-header" style="color: var(--neon-blue)">
+                <span>🔵</span> FASE 2: DEPLOYMENT (Persistencia)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-blue); font-weight: 700">
+                    Google Drive
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    /ia2pdg/talkplay/
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-purple); font-weight: 700">
+                    Carga de Activos
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    vocab + song_map
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-green)">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    model.eval()
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Modo inferencia
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flow-arrow-down">↓</div>
+
+            <!-- Fase 3 -->
+            <div class="phase-section phase-runtime-section">
+              <div class="phase-header" style="color: var(--neon-green)">
+                <span>🟢</span> FASE 3: RUNTIME (API Flask)
+              </div>
+              <div class="flow-grid">
+                <div class="flow-item">
+                  <div style="color: var(--neon-cyan); font-weight: 700">
+                    Query Usuario
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    "I want jazz to relax"
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-yellow); font-weight: 700">
+                    Tokenización
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">128 tokens</div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-pink); font-weight: 700">
+                    Forward Pass
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Encoder + Pooling
+                  </div>
+                </div>
+                <div class="flow-item">
+                  <div style="color: var(--neon-orange); font-weight: 700">
+                    Softmax 38k
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Distribución probabilidad
+                  </div>
+                </div>
+                <div class="flow-item" style="border-color: var(--neon-green)">
+                  <div style="color: var(--neon-green); font-weight: 700">
+                    Top 10 IDs
+                  </div>
+                  <div style="font-size: 0.8rem; color: #888">
+                    Candidatos para Re-ranking
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">38,343</div>
+            <div class="stat-label">Clases (Canciones)</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">256</div>
+            <div class="stat-label">d_model</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">4</div>
+            <div class="stat-label">Capas Encoder</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">8</div>
+            <div class="stat-label">Cabezales Atención</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">128</div>
+            <div class="stat-label">Max Sequence Length</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">10k</div>
+            <div class="stat-label">Tamaño Vocabulario</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Architecture -->
+      <div id="tab-architecture" class="tab-content">
+        <h2 class="section-title title-arch">
+          🏗️ Arquitectura IntentTransformer
+        </h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-purple"
+                style="
+                  background: rgba(188, 19, 254, 0.1);
+                  border-color: var(--neon-purple);
+                "
+              >
+                📐
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-purple)">
+                  Diseño Encoder-Only
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                Input Embedding
+              </div>
+              <div class="arch-content">
+                <strong>Capa:</strong> nn.Embedding(vocab_size, 256)<br />
+                <strong>Vocabulario:</strong> 10,000 tokens (PALABRA: índice)<br />
+                <strong>Output:</strong>
+                <span class="tensor-shape">(batch, 128, 256)</span>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                Positional Encoding
+              </div>
+              <div class="arch-content">
+                <strong>Tipo:</strong> Paramétrico aprendible<br />
+                <strong>Dimensión:</strong> nn.Parameter(1, 512, 256)<br />
+                <strong>Función:</strong> Captura orden secuencial del diálogo
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                Transformer Encoder
+              </div>
+              <div class="arch-content">
+                <strong>Capas:</strong> 4 x TransformerEncoderLayer<br />
+                <strong>Atención:</strong> Multi-Head (8 cabezales)<br />
+                <strong>FFN:</strong> 256 → 1024 → 256 (dim_feedforward)<br />
+                <strong>Normalización:</strong> Pre-LN (LayerNorm)
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Global Average Pooling
+              </div>
+              <div class="arch-content">
+                <strong>Operación:</strong> x.mean(dim=1)<br />
+                <strong>Input:</strong>
+                <span class="tensor-shape">(batch, 128, 256)</span><br />
+                <strong>Output:</strong>
+                <span class="tensor-shape">(batch, 256)</span><br />
+                <strong>Propósito:</strong> Vector de contexto global
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-red"
+                style="
+                  background: rgba(255, 0, 64, 0.1);
+                  border-color: var(--neon-red);
+                "
+              >
+                🔢
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">
+                  Clasificación Multiclase
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-orange)">
+                Proyección Lineal
+              </div>
+              <div class="arch-content">
+                <strong>Capa:</strong> nn.Linear(256, 38343)<br />
+                <strong>Input:</strong> Vector de contexto 256-d<br />
+                <strong>Output:</strong> Logits para cada canción
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Softmax + TopK
+              </div>
+              <div class="arch-content">
+                <strong>Función:</strong> torch.softmax(dim=1)<br />
+                <strong>Salida:</strong> Distribución probabilidad<br />
+                <strong>Selección:</strong> torch.topk(k=10)<br />
+                <strong>Uso:</strong> Selección de candidatos
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">Forward Pass Completo</div>
+              <pre><span class="keyword">def</span> <span class="function">forward</span>(self, x):
+    <span class="comment"># x: (batch, seq_len) tokens</span>
+    x = self.embed(x)                    <span class="comment"># (B, 128, 256)</span>
+    x = x + self.pos[:, :x.size(1), :]   <span class="comment"># + Positional</span>
+    x = self.encoder(x)                  <span class="comment"># (B, 128, 256)</span>
+    x = x.mean(dim=1)                    <span class="comment"># Global Pooling (B, 256)</span>
+    <span class="keyword">return</span> self.fc(x)                    <span class="comment"># (B, 38343) logits</span></pre>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: 1 / -1">
+            <div class="card-header">
+              <div
+                class="card-icon bg-cyan"
+                style="
+                  background: rgba(0, 243, 255, 0.1);
+                  border-color: var(--neon-cyan);
+                "
+              >
+                🔄
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-cyan)">
+                  Flujo de Datos Conversacionales
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">
+                Procesamiento ETL (process_dialogues)
+              </div>
+              <pre><span class="comment"># Input: Dataset TalkPlayData-2 (conversaciones estructuradas)</span>
+<span class="comment"># Estructura por fila:</span>
+<span class="comment">#   - conversation_goal: {listener_goal: "relax"}</span>
+<span class="comment">#   - user_profile: {preferred_musical_culture: "jazz"}</span>
+<span class="comment">#   - conversations: [{role: "user", content: "..."}, {role: "music", content: "SONG_ID"}]</span>
+
+<span class="keyword">def</span> <span class="function">process_dialogues</span>(df):
+    processed_data = []
+    <span class="keyword">for</span> _, row <span class="keyword">in</span> df.iterrows():
+        history = []
+        goal = row[<span class="string">'conversation_goal'</span>][<span class="string">'listener_goal'</span>]
+        culture = row[<span class="string">'user_profile'</span>][<span class="string">'preferred_musical_culture'</span>]
+        
+        <span class="keyword">for</span> turn <span class="keyword">in</span> row[<span class="string">'conversations'</span>]:
+            <span class="keyword">if</span> turn[<span class="string">'role'</span>] == <span class="string">'music'</span>:
+                <span class="comment"># Crear ejemplo de entrenamiento</span>
+                processed_data.append({
+                    <span class="string">'input_text'</span>: <span class="string">f"Goal: {goal} [SEP] Culture: {culture} [SEP] "</span> 
+                                   + <span class="string">" [SEP] "</span>.join(history),
+                    <span class="string">'target_song'</span>: turn[<span class="string">'content'</span>]   <span class="comment"># Spotify ID</span>
+                })
+            history.append(<span class="string">f"{turn['role']}: {turn['content']}"</span>)
+    
+    <span class="keyword">return</span> pd.DataFrame(processed_data)</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Training -->
+      <div id="tab-training" class="tab-content">
+        <h2 class="section-title title-train">
+          🔴 Fase 1: Entrenamiento Offline
+        </h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-green"
+                style="
+                  background: rgba(0, 255, 136, 0.1);
+                  border-color: var(--neon-green);
+                "
+              >
+                📊
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-green)">
+                  Dataset & Tokenización
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-green)">
+                MusicData (Dataset)
+              </div>
+              <div class="arch-content">
+                <strong>__getitem__:</strong><br />
+                • Input: tok.encode(input_text) →
+                <span class="tensor-shape">(128,)</span><br />
+                • Target: song2idx[target_song] → índice 0-38342
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                ResearchTokenizer
+              </div>
+              <div class="arch-content">
+                <strong>Special Tokens:</strong><br />
+                • &lt;PAD&gt;: 0 (padding)<br />
+                • &lt;UNK&gt;: 1 (out-of-vocabulary)<br />
+                • [SEP]: 2 (separador contexto)<br />
+                <strong>Preprocesamiento:</strong> lowercase + regex
+                [^a-zA-Z0-9\s?]
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-yellow)">
+                DataLoader
+              </div>
+              <div class="arch-content">
+                batch_size=32, shuffle=True<br />
+                División: 80% train / 10% val / 10% test
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-red"
+                style="
+                  background: rgba(255, 0, 64, 0.1);
+                  border-color: var(--neon-red);
+                "
+              >
+                🔥
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">
+                  Hiperparámetros
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-block" style="margin-bottom: 0.75rem">
+              <div class="arch-title" style="color: var(--neon-red)">
+                Optimización
+              </div>
+              <div class="arch-content">
+                <strong>Optimizador:</strong> AdamW<br />
+                <strong>Learning Rate:</strong> 1e-4<br />
+                <strong>Épocas:</strong> 5<br />
+                <strong>Loss:</strong> CrossEntropyLoss
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-orange)">
+                Hardware
+              </div>
+              <div class="arch-content">
+                <strong>Dispositivo:</strong> CUDA (GPU)<br />
+                <strong>Framework:</strong> PyTorch 2.x<br />
+                <strong>Entorno:</strong> Google Colab Pro
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: 1 / -1">
+            <div class="card-header">
+              <div
+                class="card-icon bg-red"
+                style="
+                  background: rgba(255, 0, 64, 0.1);
+                  border-color: var(--neon-red);
+                "
+              >
+                💾
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-red)">
+                  Checkpoint Final
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">Estructura de Archivos Exportados</div>
+              <pre>
+/content/drive/MyDrive/ia2pdg/talkplay/transformer_checkpoint/
+├── 📄 vocab.json              # Diccionario token → índice (10k entradas)
+│   {"&lt;PAD&gt;": 0, "&lt;UNK&gt;": 1, "[SEP]": 2, "goal": 3, ...}
+│
+├── 📄 song_map.pkl            # Mapeo canción → índice (38,343 clases)
+│   {"6HZILIRieu8S0iqY8kIKhj": 0, "119c93MHjrDLJTApCVGpvx": 1, ...}
+│
+└── 📄 intent_model.pth        # Pesos del modelo entrenado
+    state_dict: {
+        embed.weight: [10000, 256],
+        pos: [1, 512, 256],
+        encoder.layers.0.self_attn: ...,
+        fc.weight: [38343, 256],
+        fc.bias: [38343]
+    }</pre
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Deployment -->
+      <div id="tab-deployment" class="tab-content">
+        <h2 class="section-title title-deploy">
+          🔵 Fase 2: Deployment & Carga
+        </h2>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-blue"
+              style="
+                background: rgba(0, 102, 255, 0.1);
+                border-color: var(--neon-blue);
+              "
+            >
+              📥
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-blue)">
+                Inicialización del Sistema
+              </div>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="code-header">Carga de Componentes (app.py)</div>
+            <pre><span class="keyword">import</span> torch
+<span class="keyword">import</span> json
+<span class="keyword">import</span> pickle
+
+<span class="comment"># 1. Configuración de rutas</span>
+SAVE_PATH = <span class="string">"/content/drive/MyDrive/ia2pdg/talkplay/transformer_checkpoint"</span>
+device = torch.device(<span class="string">"cpu"</span>)  <span class="comment"># CPU para servidor web</span>
+
+<span class="comment"># 2. Cargar diccionarios</span>
+<span class="keyword">with</span> <span class="function">open</span>(<span class="function">os.path.join</span>(SAVE_PATH, <span class="string">"vocab.json"</span>), <span class="string">"r"</span>) <span class="keyword">as</span> f:
+    vocab = json.load(f)
+
+<span class="keyword">with</span> <span class="function">open</span>(<span class="function">os.path.join</span>(SAVE_PATH, <span class="string">"song_map.pkl"</span>), <span class="string">"rb"</span>) <span class="keyword">as</span> f:
+    song2idx = pickle.load(f)
+    idx2song = {i: s <span class="keyword">for</span> s, i <span class="keyword">in</span> song2idx.items()}
+
+<span class="comment"># 3. Instanciar modelo</span>
+model = IntentTransformer(<span class="function">len</span>(vocab), <span class="function">len</span>(song2idx)).to(device)
+model.load_state_dict(torch.load(
+    <span class="function">os.path.join</span>(SAVE_PATH, <span class="string">"intent_model.pth"</span>), 
+    map_location=device
+))
+model.eval()  <span class="comment"># CRÍTICO: desactiva dropout</span>
+
+<span class="function">print</span>(<span class="string">"✅ Módulo 3 cargado correctamente."</span>)</pre>
+          </div>
+
+          <div
+            class="fix-box"
+            style="
+              border-color: var(--neon-blue);
+              background: rgba(0, 102, 255, 0.05);
+            "
+          >
+            <div class="fix-title" style="color: var(--neon-blue)">
+              ⚠️ Consideraciones de Deployment
+            </div>
+            <p style="color: #aaa; font-size: 0.9rem">
+              • <strong>map_location='cpu':</strong> Obligatorio si el modelo se
+              entrenó en CUDA pero se sirve en CPU<br />
+              • <strong>model.eval():</strong> Desactiva capas de dropout y
+              batch normalization para inferencia determinista<br />
+              • <strong>torch.no_grad():</strong> Usar en forward pass para
+              reducir consumo de memoria
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Inference -->
+      <div id="tab-inference" class="tab-content">
+        <h2 class="section-title title-runtime">
+          🟢 Fase 3: Runtime Inference
+        </h2>
+
+        <div class="arch-grid">
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-cyan"
+                style="
+                  background: rgba(0, 243, 255, 0.1);
+                  border-color: var(--neon-cyan);
+                "
+              >
+                ⚡
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-cyan)">
+                  Pipeline de Predicción
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">Función predict() completa</div>
+              <pre><span class="keyword">def</span> <span class="function">predict</span>(user_query, top_n=10):
+    <span class="comment"># 1. Tokenización</span>
+    tokens = re.sub(<span class="string">r"[^a-zA-Z0-9\s?]"</span>, <span class="string">""</span>, <span class="function">str</span>(user_query).lower()).split()
+    enc = [vocab.get(t, vocab[<span class="string">"&lt;UNK&gt;"</span>]) <span class="keyword">for</span> t <span class="keyword">in</span> tokens][:128]
+    enc += [0] * (128 - <span class="function">len</span>(enc))  <span class="comment"># Padding</span>
+    
+    x = torch.tensor(enc).unsqueeze(0).to(device)  <span class="comment"># (1, 128)</span>
+    
+    <span class="comment"># 2. Inferencia</span>
+    <span class="keyword">with</span> torch.no_grad():
+        logits = model(x)              <span class="comment"># (1, 38343)</span>
+        probs = torch.softmax(logits, dim=1)
+        values, indices = torch.topk(probs, top_n)
+    
+    <span class="comment"># 3. Mapeo a IDs de Spotify</span>
+    results = []
+    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="function">range</span>(top_n):
+        song_id = idx2song[indices[0][i].item()]
+        confidence = values[0][i].item()
+        results.append({<span class="string">"id"</span>: song_id, <span class="string">"confidence"</span>: confidence})
+    
+    <span class="keyword">return</span> results</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div
+                class="card-icon bg-green"
+                style="
+                  background: rgba(0, 255, 136, 0.1);
+                  border-color: var(--neon-green);
+                "
+              >
+                🎯
+              </div>
+              <div>
+                <div class="card-title" style="color: var(--neon-green)">
+                  Integración con Flask
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block">
+              <div class="code-header">Endpoint /predict</div>
+              <pre>@app.route(<span class="string">"/predict"</span>, methods=[<span class="string">"POST"</span>])
+<span class="keyword">def</span> <span class="function">predict_endpoint</span>():
+    <span class="keyword">try</span>:
+        data = request.json
+        user_input = data.get(<span class="string">"lyrics"</span>, <span class="string">""</span>)
+        
+        <span class="keyword">if</span> <span class="keyword">not</span> user_input:
+            <span class="keyword">return</span> jsonify({<span class="string">"error"</span>: <span class="string">"No se recibió texto"</span>}), 400
+        
+        <span class="comment"># Inferencia</span>
+        tokens = tokenize(user_input)
+        <span class="keyword">with</span> torch.no_grad():
+            outputs = model(tokens)
+            probs = torch.softmax(outputs, dim=1)
+            values, indices = torch.topk(probs, 10)
+        
+        <span class="comment"># Formatear respuesta</span>
+        results = []
+        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="function">range</span>(10):
+            results.append({
+                <span class="string">"track_name"</span>: <span class="string">f"Track ID: {idx2song[indices[0][i].item()][:8]}..."</span>,
+                <span class="string">"artist_name"</span>: <span class="string">"Recomendación EchoPulse"</span>,
+                <span class="string">"similarity"</span>: values[0][i].item()
+            })
+        
+        <span class="keyword">return</span> jsonify(results)
+    
+    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+        <span class="keyword">return</span> jsonify({<span class="string">"error"</span>: <span class="function">str</span>(e)}), 500</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: Metrics -->
+      <div id="tab-metrics" class="tab-content">
+        <h2
+          class="section-title"
+          style="color: var(--neon-purple); border-color: var(--neon-purple)"
+        >
+          📊 Métricas de Validación
+        </h2>
+
+        <div class="highlight-box">
+          <p style="color: #ccc; font-size: 0.95rem; line-height: 1.6">
+            La evaluación se realizó sobre <strong>16,000 muestras</strong> del
+            conjunto de validación. Dado que el modelo predice entre
+            <strong>38,343 clases</strong>, el azar tendría una precisión del
+            <span class="accent-purple">0.0026%</span>. El modelo supera el azar
+            por un factor de <strong>2,440x</strong>, validando el aprendizaje
+            de patrones conversacionales.
+          </p>
+        </div>
+
+        <div class="arch-grid" style="grid-template-columns: repeat(4, 1fr)">
+          <div class="metric-box">
+            <div class="metric-value">0.63%</div>
+            <div class="metric-label">Hit Rate @1</div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 0.5rem">
+              Acierto exacto
+            </div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">2.72%</div>
+            <div class="metric-label">Hit Rate @5</div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 0.5rem">
+              En top 5
+            </div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">4.88%</div>
+            <div class="metric-label">Hit Rate @10</div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 0.5rem">
+              Embudo semántico
+            </div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value">0.0159</div>
+            <div class="metric-label">MRR</div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 0.5rem">
+              Mean Reciprocal Rank
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem">
+          <div class="card-header">
+            <div
+              class="card-icon bg-purple"
+              style="
+                background: rgba(188, 19, 254, 0.1);
+                border-color: var(--neon-purple);
+              "
+            >
+              📈
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-purple)">
+                Interpretación Académica
+              </div>
+            </div>
+          </div>
+
+          <div class="arch-grid">
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-cyan)">
+                Función de Embudo (Retrieval)
+              </div>
+              <div class="arch-content">
+                El <strong>Hit Rate @10 de 4.88%</strong> demuestra que el
+                modelo puede reducir el universo de búsqueda de 38,343 a 10
+                candidatos relevantes, descartando el <strong>99.9%</strong> de
+                la base de datos irrelevante.
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-pink)">
+                Sinergia con Re-Ranking
+              </div>
+              <div class="arch-content">
+                El desfase entre Top-10 (4.88%) y Top-1 (0.63%) justifica la
+                implementación del
+                <strong>Módulo 2 (Tabla Maestra)</strong> para re-ordenar
+                candidatos usando features técnicos (BPM, Energía, Valencia).
+              </div>
+            </div>
+
+            <div class="arch-block">
+              <div class="arch-title" style="color: var(--neon-green)">
+                Validación de Hipótesis
+              </div>
+              <div class="arch-content">
+                El modelo correlaciona frases como
+                <em>"I'm feeling tired"</em> con géneros relajantes (Jazz,
+                Ambient)
+                <strong>sin acceso previo a metadatos técnicos</strong>,
+                validando el diseño del sistema de intención.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div
+              class="card-icon bg-yellow"
+              style="
+                background: rgba(243, 255, 0, 0.1);
+                border-color: var(--neon-yellow);
+              "
+            >
+              🧪
+            </div>
+            <div>
+              <div class="card-title" style="color: var(--neon-yellow)">
+                Ejemplo de Inferencia Real
+              </div>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="code-header">
+              Query: "I want some rock music to dance at a party"
+            </div>
+            <pre>
+🔎 Query: 'I want some rock music to dance at a party'
+------------------------------
+1. ID: 6L89mwZXSOwYl76YXfX13s | Prob: 0.6983%
+2. ID: 0tZ3mElWcr74OOhKEiNz1x | Prob: 0.4850%
+3. ID: 70wYA8oYHoMzhRRkARoMhU | Prob: 0.4364%
+4. ID: 0grFc6klR3hxoHLcgCYsF4 | Prob: 0.4070%
+5. ID: 5UWwZ5lm5PKu6eKsHAGxOk | Prob: 0.3784%
+6. ID: 0ntQJM78wzOLVeCUAW7Y45 | Prob: 0.3693%
+7. ID: 5G1sTBGbZT5o4PNRc75RKI | Prob: 0.3450%
+8. ID: 1f2V8U1BiWaC9aJWmpOARe | Prob: 0.2833%
+9. ID: 64BbK9SFKH2jk86U3dGj2P | Prob: 0.2745%
+10. ID: 1L94M3KIu7QluZe63g64rv | Prob: 0.2629%</pre
+            >
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      function switchTab(tabId) {
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((c) => c.classList.remove("active"));
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document.getElementById("tab-" + tabId).classList.add("active");
+        event.target.classList.add("active");
+      }
+    </script>
+  </body>
+</html>

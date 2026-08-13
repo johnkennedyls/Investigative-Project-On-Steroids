@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoPulse AI - Poster Científico</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: 90cm 120cm;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            width: 90cm;
+            min-height: 120cm;
+            margin: 0 auto;
+        }
+
+        .poster {
+            width: 90cm;
+            min-height: 120cm;
+            background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+            display: flex;
+            flex-direction: column;
+            padding: 1cm;
+            gap: 0.8cm;
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+            border-radius: 1cm;
+            padding: 2cm 3cm;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0.5cm 1cm rgba(0,0,0,0.15);
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0.5cm;
+            background: #00bcd4;
+        }
+
+        .header h1 {
+            font-size: 5cm;
+            color: white;
+            font-weight: 900;
+            letter-spacing: 0.1cm;
+            text-shadow: 0.2cm 0.2cm 0.4cm rgba(0,0,0,0.3);
+            margin-bottom: 0.5cm;
+        }
+
+        .header .subtitle {
+            font-size: 1.8cm;
+            color: rgba(255,255,255,0.95);
+            line-height: 1.4;
+            margin-bottom: 0.8cm;
+        }
+
+        .header .authors {
+            font-size: 1.2cm;
+            color: #00bcd4;
+            line-height: 1.6;
+        }
+
+        /* GRID LAYOUT */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1cm;
+        }
+
+        .grid-1 {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        /* SECTION CARDS */
+        .section {
+            background: white;
+            border-radius: 0.8cm;
+            box-shadow: 0 0.3cm 0.6cm rgba(0,0,0,0.08);
+            overflow: hidden;
+            border: 0.1cm solid #e0e0e0;
+        }
+
+        .section-header {
+            padding: 0.8cm 1.5cm;
+            font-size: 1.6cm;
+            font-weight: 800;
+            color: white;
+            text-align: center;
+            letter-spacing: 0.05cm;
+        }
+
+        .section-body {
+            padding: 1.5cm;
+        }
+
+        .bg-orange { background: linear-gradient(135deg, #ff5722, #ff8a65); }
+        .bg-blue { background: linear-gradient(135deg, #0d47a1, #1976d2); }
+        .bg-green { background: linear-gradient(135deg, #4caf50, #81c784); }
+        .bg-cyan { background: linear-gradient(135deg, #00bcd4, #4dd0e1); }
+        .bg-purple { background: linear-gradient(135deg, #7b1fa2, #9c27b0); }
+
+        /* PROBLEM SECTION */
+        .problem-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1cm;
+        }
+
+        .funnel {
+            width: 80%;
+            height: 8cm;
+            position: relative;
+        }
+
+        .funnel-top {
+            width: 100%;
+            height: 3cm;
+            background: linear-gradient(180deg, #ffccbc 0%, #ffab91 100%);
+            border-radius: 0.5cm 0.5cm 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2cm;
+            font-weight: bold;
+            color: #bf360c;
+        }
+
+        .funnel-mesh {
+            width: 60%;
+            height: 4cm;
+            margin: 0 auto;
+            background: repeating-linear-gradient(
+                45deg,
+                #ffab91,
+                #ffab91 0.5cm,
+                #ff8a65 0.5cm,
+                #ff8a65 1cm
+            );
+            clip-path: polygon(0 0, 100% 0, 70% 100%, 30% 100%);
+        }
+
+        .funnel-bottom {
+            width: 40%;
+            height: 2cm;
+            margin: 0 auto;
+            background: #c8e6c9;
+            border-radius: 0 0 0.5cm 0.5cm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1cm;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        .stat-box {
+            background: #e3f2fd;
+            border: 0.15cm solid #ff5722;
+            border-radius: 0.5cm;
+            padding: 1cm;
+            text-align: center;
+            width: 90%;
+        }
+
+        .stat-box h3 {
+            font-size: 1.3cm;
+            color: #1a237e;
+            margin-bottom: 0.3cm;
+        }
+
+        .stat-box p {
+            font-size: 1cm;
+            color: #757575;
+        }
+
+        /* OBJECTIVE SECTION */
+        .objective-content {
+            background: #e3f2fd;
+            border-radius: 0.5cm;
+            padding: 1.5cm;
+            border: 0.15cm solid #0d47a1;
+        }
+
+        .objective-content h3 {
+            font-size: 1.4cm;
+            color: #1a237e;
+            text-align: center;
+            margin-bottom: 1cm;
+            font-weight: 700;
+        }
+
+        .bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8cm;
+        }
+
+        .bullet-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.5cm;
+            font-size: 1.3cm;
+            color: #212121;
+            font-weight: 600;
+        }
+
+        .bullet-icon {
+            font-size: 1.8cm;
+        }
+
+        .objective-footer {
+            text-align: center;
+            margin-top: 1cm;
+            font-size: 1.1cm;
+            color: #757575;
+            font-style: italic;
+        }
+
+        /* ARCHITECTURE SECTION */
+        .pipeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 0.5cm;
+            padding: 1cm 0;
+        }
+
+        .stage {
+            flex: 1;
+            background: white;
+            border-radius: 0.5cm;
+            border: 0.15cm solid #e0e0e0;
+            padding: 0.8cm;
+            text-align: center;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stage-number {
+            width: 2cm;
+            height: 2cm;
+            background: #1a237e;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2cm;
+            font-weight: bold;
+            margin: 0 auto 0.5cm;
+        }
+
+        .stage-title {
+            font-size: 1.1cm;
+            font-weight: 800;
+            color: #212121;
+            margin-bottom: 0.5cm;
+            line-height: 1.3;
+        }
+
+        .stage-details {
+            font-size: 0.9cm;
+            color: #757575;
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+
+        .stage-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5cm;
+            color: #00bcd4;
+            padding: 0 0.2cm;
+        }
+
+        .pipeline-footer {
+            text-align: center;
+            font-size: 1.1cm;
+            color: #757575;
+            font-style: italic;
+            margin-top: 0.5cm;
+        }
+
+        /* RESULTS SECTION */
+        .chart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5cm;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 1.5cm;
+            height: 10cm;
+            width: 100%;
+            padding: 0 1cm;
+        }
+
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3cm;
+        }
+
+        .bar {
+            width: 3cm;
+            border-radius: 0.3cm 0.3cm 0 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 0.3cm;
+            font-size: 0.9cm;
+            font-weight: bold;
+            color: white;
+            position: relative;
+        }
+
+        .bar-value {
+            position: absolute;
+            top: -1cm;
+            font-size: 0.9cm;
+            font-weight: bold;
+            color: #212121;
+        }
+
+        .bar-label {
+            font-size: 0.9cm;
+            color: #757575;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .highlight-box {
+            background: #c8e6c9;
+            border: 0.15cm solid #4caf50;
+            border-radius: 0.5cm;
+            padding: 0.8cm 1.5cm;
+            text-align: center;
+        }
+
+        .highlight-box .big {
+            font-size: 2cm;
+            font-weight: 900;
+            color: #4caf50;
+        }
+
+        .highlight-box .small {
+            font-size: 1cm;
+            color: #757575;
+        }
+
+        /* DIVERSITY SECTION */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8cm;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 0.5cm;
+            border: 0.15cm solid #e0e0e0;
+            padding: 1cm;
+            text-align: center;
+        }
+
+        .metric-card .metric-name {
+            font-size: 1.1cm;
+            font-weight: 700;
+            color: #212121;
+            margin-bottom: 0.5cm;
+        }
+
+        .metric-bars {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 0.5cm;
+            height: 5cm;
+            margin-bottom: 0.5cm;
+        }
+
+        .metric-bar {
+            width: 2.5cm;
+            border-radius: 0.2cm 0.2cm 0 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 0.2cm;
+            font-size: 0.8cm;
+            font-weight: bold;
+            color: white;
+        }
+
+        .metric-bar.baseline { background: #bdbdbd; }
+        .metric-bar.echopulse { background: #00bcd4; }
+
+        .metric-improvement {
+            font-size: 1.3cm;
+            font-weight: 900;
+            color: #00bcd4;
+        }
+
+        /* FOOTER */
+        .footer {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+            border-radius: 0.8cm;
+            padding: 1.5cm 3cm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 0.3cm 0.6cm rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        .footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 0.3cm;
+            background: #00bcd4;
+        }
+
+        .footer-left, .footer-right {
+            text-align: center;
+        }
+
+        .footer-center {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .footer .logo-text {
+            font-size: 1.4cm;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .footer .event-name {
+            font-size: 1.4cm;
+            font-weight: 700;
+            color: #00bcd4;
+            margin-bottom: 0.3cm;
+        }
+
+        .footer .contact {
+            font-size: 1cm;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .footer .emoji {
+            font-size: 2.5cm;
+        }
+
+        /* PRINT INSTRUCTIONS OVERLAY */
+        .print-instructions {
+            display: none;
+        }
+
+        @media print {
+            body {
+                background: white;
+                width: 90cm;
+                height: 120cm;
+            }
+            .poster {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="poster">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>EchoPulse AI</h1>
+            <div class="subtitle">
+                Arquitectura Híbrida Local de Datos para Recomendación<br>
+                Multimodal de Música Integrando WASABI, MSD y TalkPlay
+            </div>
+            <div class="authors">
+                John Kennedy Landazuri S. · Cristian Camilo Ordóñez Q. · Cristian Méndez R. · Hugo Armando Ordoñez<br>
+                Semillero IMS-Mobile · Ingeniería de Sistemas · Fundación Universitaria de Popayán
+            </div>
+        </div>
+
+        <!-- ROW 1: PROBLEM + OBJECTIVE -->
+        <div class="grid-2">
+            <!-- PROBLEM -->
+            <div class="section">
+                <div class="section-header bg-orange">1. PROBLEMA: El Sesgo de Popularidad</div>
+                <div class="section-body">
+                    <div class="problem-visual">
+                        <div class="funnel">
+                            <div class="funnel-top">🎵 Artistas Consolidados (Alta Popularidad)</div>
+                            <div class="funnel-mesh"></div>
+                            <div class="funnel-bottom">🌱 Artistas Emergentes (Filtrados)</div>
+                        </div>
+                        <div class="stat-box">
+                            <h3>El 80% de las recomendaciones se concentran en el 20% de artistas</h3>
+                            <p>Los algoritmos de filtrado colaborativo refuerzan este sesgo estructural</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OBJECTIVE -->
+            <div class="section">
+                <div class="section-header bg-blue">2. OBJETIVO GENERAL</div>
+                <div class="section-body">
+                    <div class="objective-content">
+                        <h3>Desarrollar un agente recomendador de música híbrido que integre:</h3>
+                        <ul class="bullet-list">
+                            <li><span class="bullet-icon">🎯</span> Técnicas tradicionales de recomendación</li>
+                            <li><span class="bullet-icon">🤖</span> Arquitectura Transformer multimodal</li>
+                            <li><span class="bullet-icon">💬</span> Modelos de lenguaje generativo (LLM)</li>
+                            <li><span class="bullet-icon">🔄</span> Interfaz conversacional adaptativa</li>
+                        </ul>
+                        <div class="objective-footer">
+                            Adaptándose dinámicamente a preferencias<br>y retroalimentación de usuarios
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: ARCHITECTURE -->
+        <div class="section">
+            <div class="section-header bg-purple">3. ARQUITECTURA TRIPLE-ENCODER TRANSFORMER</div>
+            <div class="section-body">
+                <div class="pipeline">
+                    <div class="stage">
+                        <div class="stage-number">1</div>
+                        <div class="stage-title">FUENTES DE DATOS</div>
+                        <div class="stage-details">
+                            WASABI Dataset<br>
+                            Million Song Dataset<br>
+                            Lyrics 1950-2019<br>
+                            TalkPlayData-2
+                        </div>
+                    </div>
+                    <div class="stage-arrow">➜</div>
+                    <div class="stage">
+                        <div class="stage-number">2</div>
+                        <div class="stage-title">DATA LAKE</div>
+                        <div class="stage-details">
+                            Parquet local<br>
+                            JSON Schema<br>
+                            Versionado manual<br>
+                            SQLite catalog
+                        </div>
+                    </div>
+                    <div class="stage-arrow">➜</div>
+                    <div class="stage">
+                        <div class="stage-number">3</div>
+                        <div class="stage-title">PROCESAMIENTO</div>
+                        <div class="stage-details">
+                            PySpark ETL<br>
+                            Limpieza MICE<br>
+                            MAD outlier<br>
+                            Feature engineering
+                        </div>
+                    </div>
+                    <div class="stage-arrow">➜</div>
+                    <div class="stage">
+                        <div class="stage-number">4</div>
+                        <div class="stage-title">MODELADO</div>
+                        <div class="stage-details">
+                            IntentTransformer<br>
+                            MST-MR Fusion<br>
+                            Cross-Attention<br>
+                            512-dim embeddings
+                        </div>
+                    </div>
+                    <div class="stage-arrow">➜</div>
+                    <div class="stage">
+                        <div class="stage-number">5</div>
+                        <div class="stage-title">PRODUCTO</div>
+                        <div class="stage-details">
+                            FastAPI Gateway<br>
+                            ONNX Runtime<br>
+                            Sub-250ms latency<br>
+                            Qwen 2.5 LLM
+                        </div>
+                    </div>
+                </div>
+                <div class="pipeline-footer">
+                    Pipeline local de 5 etapas · Sin dependencias en la nube · Reproducible y trazable
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 3: RESULTS -->
+        <div class="grid-2">
+            <!-- PRECISION RESULTS -->
+            <div class="section">
+                <div class="section-header bg-green">4. RESULTADOS: Métricas de Precisión</div>
+                <div class="section-body">
+                    <div class="chart-container">
+                        <div class="bar-chart">
+                            <div class="bar-group">
+                                <div class="bar" style="height: 4.5cm; background: #bdbdbd;">
+                                    <span class="bar-value">0.142</span>
+                                </div>
+                                <div class="bar-label">Collab.<br>Filter</div>
+                            </div>
+                            <div class="bar-group">
+                                <div class="bar" style="height: 5cm; background: #bdbdbd;">
+                                    <span class="bar-value">0.158</span>
+                                </div>
+                                <div class="bar-label">BERT4Rec</div>
+                            </div>
+                            <div class="bar-group">
+                                <div class="bar" style="height: 5.2cm; background: #bdbdbd;">
+                                    <span class="bar-value">0.164</span>
+                                </div>
+                                <div class="bar-label">SASRec</div>
+                            </div>
+                            <div class="bar-group">
+                                <div class="bar" style="height: 6cm; background: #bdbdbd;">
+                                    <span class="bar-value">0.189</span>
+                                </div>
+                                <div class="bar-label">TalkPlay</div>
+                            </div>
+                            <div class="bar-group">
+                                <div class="bar" style="height: 9.5cm; background: #4caf50;">
+                                    <span class="bar-value" style="color: #4caf50; font-size: 1.2cm;">0.312</span>
+                                </div>
+                                <div class="bar-label" style="color: #4caf50; font-weight: bold;">EchoPulse<br>AI</div>
+                            </div>
+                        </div>
+                        <div class="highlight-box">
+                            <div class="big">+119.7%</div>
+                            <div class="small">Mejora en Hit@10 vs. Baseline</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIVERSITY RESULTS -->
+            <div class="section">
+                <div class="section-header bg-cyan">5. DIVERSIDAD & ARTISTAS EMERGENTES</div>
+                <div class="section-body">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-name">ILD (Diversidad)</div>
+                            <div class="metric-bars">
+                                <div class="metric-bar baseline" style="height: 2.8cm;">0.342</div>
+                                <div class="metric-bar echopulse" style="height: 4.2cm;">0.497</div>
+                            </div>
+                            <div class="metric-improvement">+45.3%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">EAD (Emergentes)</div>
+                            <div class="metric-bars">
+                                <div class="metric-bar baseline" style="height: 1.2cm;">0.127</div>
+                                <div class="metric-bar echopulse" style="height: 3.5cm;">0.327</div>
+                            </div>
+                            <div class="metric-improvement">+157.9%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">SCS (Semántica)</div>
+                            <div class="metric-bars">
+                                <div class="metric-bar baseline" style="height: 3.5cm;">0.412</div>
+                                <div class="metric-bar echopulse" style="height: 5.5cm;">0.741</div>
+                            </div>
+                            <div class="metric-improvement">+79.9%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">IAR (Intención)</div>
+                            <div class="metric-bars">
+                                <div class="metric-bar baseline" style="height: 3.2cm;">0.385</div>
+                                <div class="metric-bar echopulse" style="height: 5.2cm;">0.698</div>
+                            </div>
+                            <div class="metric-improvement">+81.3%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <div class="footer-left">
+                <div class="emoji">🔬</div>
+                <div class="logo-text">Semillero<br>IMS-Mobile</div>
+            </div>
+            <div class="footer-center">
+                <div class="event-name">IX ENCUENTRO DE SEMILLEROS DE INVESTIGACIÓN 2026</div>
+                <div class="contact">
+                    john.landazuri@estudiante.fup.edu.co | jkls1998@gmail.com | 3116244621
+                </div>
+            </div>
+            <div class="footer-right">
+                <div class="emoji">🎓</div>
+                <div class="logo-text">FUP<br>Ingeniería de<br>Sistemas</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
