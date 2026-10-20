@@ -160,7 +160,13 @@ def enriquecer_candidato(candidato: dict) -> dict:
     song_id = candidato.get("id", "")
     metadata = obtener_metadata(song_id)
     enlaces = generar_enlaces_reales(song_id, metadata)
-    return {**candidato, **metadata, **enlaces}
+    # El candidato manda: el metadata solo rellena campos vacíos/Unknown,
+    # nunca pisa un nombre real con "Unknown"
+    merged = {**metadata, **candidato}
+    for key in ("track_name", "artist_name", "genre"):
+        if merged.get(key) in [None, "", "Unknown"] and metadata.get(key) not in [None, "", "Unknown"]:
+            merged[key] = metadata[key]
+    return {**merged, **enlaces}
 
 # =====================================================================
 # 🌐 HUGGING FACE - Qwen 2.5

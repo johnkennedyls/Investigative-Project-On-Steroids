@@ -1,10 +1,14 @@
 import os
 import re
+import sys
 import json
 import pickle
 import torch
 import torch.nn as nn
 from flask import Flask, request, jsonify, render_template
+
+sys.stdout.reconfigure(errors="replace")
+sys.stderr.reconfigure(errors="replace")
 
 app = Flask(__name__)
 
@@ -12,6 +16,7 @@ app = Flask(__name__)
 MODEL_PATH = "intent_model.pth"
 VOCAB_PATH = "vocab.json"
 SONG_MAP_PATH = "song_map.pkl"
+METADATA_PATH = "song_metadata.json"
 
 # Definir la arquitectura idéntica a la fase de entrenamiento
 class IntentTransformer(nn.Module):
@@ -32,6 +37,7 @@ class IntentTransformer(nn.Module):
 
 # Cargar componentes globales
 device = torch.device("cpu") # Usamos CPU para el servidor web
+SONG_METADATA = {}
 try:
     with open(VOCAB_PATH, "r") as f:
         vocab = json.load(f)
@@ -39,10 +45,14 @@ try:
         song2idx = pickle.load(f)
         idx2song = {i: s for s, i in song2idx.items()}
 
+    if os.path.exists(METADATA_PATH):
+        with open(METADATA_PATH, "r", encoding="utf-8") as f:
+            SONG_METADATA = json.load(f)
+
     model = IntentTransformer(len(vocab), len(song2idx))
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     model.eval()
-    print("✅ Módulo 3 cargado correctamente.")
+    print(f"✅ Módulo 3 cargado correctamente. Metadatos: {len(SONG_METADATA):,} canciones.")
 except Exception as e:
     print(f"❌ Error cargando el modelo: {e}")
 
@@ -78,12 +88,15 @@ def predict():
         for i in range(10):
             song_id = idx2song[indices[0][i].item()]
             similarity = values[0][i].item()
-            
-            # Por ahora devolvemos el ID y un nombre ficticio para el prototipo
+            metadata = SONG_METADATA.get(song_id, {})
+            track_name = metadata.get("track_name")
+            artist_name = metadata.get("artist_name")
+
             results.append({
-                "track_name": f"Track ID: {song_id[:8]}...",
-                "artist_name": "Recomendación EchoPulse",
-                "similarity": similarity
+                "track_name": track_name if track_name not in [None, "Unknown", "Not Found", ""] else f"Canción {song_id[:8]}",
+                "artist_name": artist_name if artist_name not in [None, "Unknown", "Not Found", ""] else "Artista desconocido",
+                "similarity": similarity,
+                "spotify_url": f"https://open.spotify.com/track/{song_id}"
             })
 
         return jsonify(results)

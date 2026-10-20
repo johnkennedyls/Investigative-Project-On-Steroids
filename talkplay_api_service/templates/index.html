@@ -172,6 +172,22 @@
         text-transform: uppercase;
       }
 
+      .spotify-link {
+        align-self: center;
+        background: #1db954;
+        color: #0b0b12;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 20px;
+        white-space: nowrap;
+      }
+
+      .spotify-link:hover {
+        filter: brightness(1.15);
+      }
+
       .status-msg {
         text-align: center;
         margin-top: 20px;
@@ -253,6 +269,11 @@
                 <span class="match-val">${(song.similarity * 100).toFixed(2)}%</span>
                 <span class="match-label">Afinidad</span>
               </div>
+              ${
+                song.spotify_url
+                  ? `<a class="spotify-link" href="${song.spotify_url}" target="_blank" rel="noopener" title="Abrir en Spotify">▶ Spotify</a>`
+                  : ""
+              }
             `;
             resultsUl.appendChild(li);
           });
