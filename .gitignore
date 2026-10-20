@@ -16,3 +16,7 @@ env/
 
 .env
 **/.env
+
+# Plantilla de configuración sin secretos: sí se versiona
+!.env.example
+!**/.env.example

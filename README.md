@@ -98,11 +98,37 @@ pip install -r requirements.txt
 ### Run the API
 
 ```bash
-cd api_service
+cd echopulse_llm_orquestator
+pip install -r requirements.txt
 python app.py
 ```
 
 Then open your browser at `http://localhost:5000` (or whichever port is configured).
+
+### Voice (LLM) — free Qwen
+
+The agent answers with Qwen through `echopulse_llm_orquestator/llm_client.py`,
+which tries several providers in order and skips the ones that fail. Hugging
+Face's router no longer serves Qwen for free (HTTP 402: no credits), so the
+default working path is a local Qwen via Ollama:
+
+```bash
+ollama pull hf.co/Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M   # or qwen2.5:1.5b-instruct-q4_K_M on CPU
+python app.py
+```
+
+Other free options (a Hugging Face Space of your own, Groq, Alibaba DashScope)
+are configured in `.env` — see [`.env.example`](echopulse_llm_orquestator/.env.example)
+and the technical write-up [`docs/LLM_QWEN_GRATIS.md`](docs/LLM_QWEN_GRATIS.md).
+
+Useful checks:
+
+```bash
+python scripts/test_llm.py                      # offline tests (402/429, conversation engine)
+curl -X POST http://localhost:5000/api/llm/probar
+python scripts/simular_conversacion.py --turnos 5   # simulated 5-turn conversation
+```
+
 
 ### Explore the notebooks
 

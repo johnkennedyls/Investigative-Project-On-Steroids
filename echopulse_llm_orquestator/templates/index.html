@@ -96,15 +96,25 @@
             ><span class="text-slate-400">AI</span>
           </h1>
         </div>
-        <span
-          id="status"
-          class="text-xs text-emerald-400 flex items-center gap-1.5 font-mono"
-        >
+        <div class="flex items-center gap-3">
+          <button
+            onclick="nuevaConversacion()"
+            class="px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 rounded-lg border border-slate-700/50 transition flex items-center gap-1.5"
+            title="Empezar una conversación desde cero"
+          >
+            <i class="fas fa-rotate-left text-[10px]"></i>
+            Nueva conversación
+          </button>
           <span
-            class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
-          ></span>
-          ONLINE
-        </span>
+            id="status"
+            class="text-xs text-emerald-400 flex items-center gap-1.5 font-mono"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
+            ></span>
+            ONLINE
+          </span>
+        </div>
       </div>
     </header>
 
@@ -312,8 +322,8 @@
         <div id="modal-content" class="space-y-3"></div>
         <div class="mt-3 pt-3 border-t border-slate-700/50">
           <p class="text-[10px] text-slate-500 text-center font-mono">
-            💡 Flujo corregido: M2 (Retrieval Tabla Maestra) → M3 (Re-ranking
-            Intención) • Enlaces Spotify directos por ID
+            💡 M2 (Retrieval Tabla Maestra) → M3 (Re-ranking Intención) •
+            Enlaces directos a Spotify
           </p>
         </div>
       </div>
@@ -336,6 +346,31 @@
       const statusEl = document.getElementById("status");
       let loading = false,
         metricsInterval = null;
+
+      // Sesión de conversación: persiste en el navegador y la recuerda el backend
+      let sessionId = localStorage.getItem("echopulse_session");
+      if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem("echopulse_session", sessionId);
+      }
+
+      async function nuevaConversacion() {
+        try {
+          await fetch("/api/chat/reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+        } catch (e) {}
+        sessionId = crypto.randomUUID();
+        localStorage.setItem("echopulse_session", sessionId);
+        chat.innerHTML = "";
+        addMessage(
+          "Nueva conversación iniciada. ¿En qué mood estás? Cuéntame qué necesitas y te recomiendo.",
+          false
+        );
+        input.focus();
+      }
 
       function showToast(message, type = "info") {
         const toast = document.getElementById("toast");
@@ -400,6 +435,20 @@
         }, 30000);
       }
 
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c]
+        );
+      }
+
       function addMessage(text, isUser = false, metadata = null) {
         const div = document.createElement("div");
         div.className = `flex gap-2.5 fade-in ${isUser ? "flex-row-reverse" : ""}`;
@@ -411,12 +460,11 @@
           : "bg-slate-800/50 border-slate-700/50 rounded-tl-none";
 
         let extra = "";
-        // ✅ CAMBIO CLAVE: Usar nombres corregidos del backend
         if (
           metadata?.module2_retrieval?.length ||
           metadata?.module3_reranked?.length
         ) {
-          extra = `<button onclick="showResults(${JSON.stringify(metadata).replace(/"/g, "&quot;")})" class="mt-2.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 rounded text-[10px] transition text-blue-300 font-mono">[VIEW_TOP_10]</button>`;
+          extra = `<button onclick="showResults(${JSON.stringify(metadata).replace(/"/g, "&quot;")})" class="mt-2.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 rounded text-[10px] transition text-blue-300">Ver top 10 completo</button>`;
         }
         // Las recomendaciones finales siempre vienen del re-ranker (Módulo 3)
         if (metadata?.module3_reranked?.length) {
@@ -426,28 +474,34 @@
               const name =
                 song.track_name && song.track_name !== "Unknown"
                   ? song.track_name
-                  : song.id
-                    ? song.id.slice(0, 12) + "..."
-                    : "Unknown";
+                  : "Canción recomendada";
               const artist =
                 song.artist_name && song.artist_name !== "Unknown"
                   ? song.artist_name
                   : "";
               return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/40 rounded border border-slate-700/40">
               <div class="flex-1 min-w-0 pr-2">
-                <span class="text-xs font-medium text-slate-200 truncate block">${name}</span>
-                ${artist ? `<span class="text-[10px] text-slate-500">• ${artist}</span>` : ""}
+                <span class="text-xs font-medium text-slate-200 truncate block">${escapeHtml(name)}</span>
+                <span class="text-[10px] text-slate-500">${artist ? `• ${escapeHtml(artist)}` : ""}${song.emergente ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>` : ""}</span>
               </div>
               <div class="flex gap-1 flex-shrink-0">
-                ${song.spotify_url ? `<a href="${song.spotify_url}" target="_blank" class="p-1.5 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Spotify"><i class="fab fa-spotify text-[10px]"></i></a>` : ""}
-                ${song.youtube_url ? `<a href="${song.youtube_url}" target="_blank" class="p-1.5 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="YouTube"><i class="fab fa-youtube text-[10px]"></i></a>` : ""}
+                ${song.spotify_url ? `<a href="${escapeHtml(song.spotify_url)}" target="_blank" class="p-1.5 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Abrir en Spotify"><i class="fab fa-spotify text-[10px]"></i></a>` : ""}
+                ${song.youtube_url ? `<a href="${escapeHtml(song.youtube_url)}" target="_blank" class="p-1.5 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="Buscar en YouTube"><i class="fab fa-youtube text-[10px]"></i></a>` : ""}
               </div>
             </div>`;
             })
             .join("");
-          extra += `<div class="mt-2.5 pt-2.5 border-t border-slate-700/40"><p class="text-[10px] text-slate-500 mb-1.5 font-mono">[RECOMMENDATIONS]</p><div class="space-y-1.5">${cards}</div></div>`;
+          extra += `<div class="mt-2.5 pt-2.5 border-t border-slate-700/40"><p class="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Recomendaciones para ti</p><div class="space-y-1.5">${cards}</div></div>`;
         }
-        div.innerHTML = `${avatar}<div class="${bg} rounded-lg p-3.5 max-w-[85%] border"><p class="text-slate-200 text-sm leading-relaxed">${text}</p>${extra}</div>`;
+        // Con qué motor respondió (Qwen local, endpoint, o modo determinista)
+        if (metadata?.llm?.etiqueta) {
+          const motor =
+            metadata.llm.proveedor === "determinista"
+              ? "MODO DETERMINISTA (sin LLM)"
+              : metadata.llm.etiqueta.toUpperCase();
+          extra += `<p class="mt-2 text-[9px] font-mono text-slate-600 uppercase tracking-wider">VOZ :: ${escapeHtml(motor)}</p>`;
+        }
+        div.innerHTML = `${avatar}<div class="${bg} rounded-lg p-3.5 max-w-[85%] border"><p class="text-slate-200 text-sm leading-relaxed">${escapeHtml(text)}</p>${extra}</div>`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
       }
@@ -463,8 +517,8 @@
           typing.className = "flex gap-2.5 fade-in";
           typing.innerHTML = `<div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center border border-blue-500/30"><i class="fas fa-microchip text-white text-xs"></i></div>
             <div class="bg-slate-800/50 rounded-lg rounded-tl-none p-3.5 border border-slate-700/50">
-              <p class="text-slate-400 typing text-sm font-mono">PROCESSING_QUERY...</p>
-              <p class="text-[10px] text-slate-600 mt-0.5 font-mono">intent → M2(retrieval) → M3(rerank) → generate</p>
+              <p class="text-slate-400 typing text-sm">Pensando…</p>
+              <p class="text-[10px] text-slate-600 mt-0.5 font-mono">intent → M2 (retrieval) → M3 (re-ranking) → respuesta</p>
             </div>`;
           chat.appendChild(typing);
           chat.scrollTop = chat.scrollHeight;
@@ -519,13 +573,8 @@
                     item.track_name && item.track_name !== "Unknown",
                   hasArtist =
                     item.artist_name && item.artist_name !== "Unknown";
-                const displayName = hasName
-                  ? item.track_name
-                  : item.id
-                    ? item.id.slice(0, 12) + "..."
-                    : "Unknown";
-                const displayArtist = hasArtist ? item.artist_name : "",
-                  songId = item.id ? item.id.slice(0, 12) + "..." : "N/A";
+                const displayName = hasName ? item.track_name : "Canción recomendada";
+                const displayArtist = hasArtist ? item.artist_name : "";
                 const score =
                   item.final_score !== undefined
                     ? item.final_score
@@ -536,8 +585,7 @@
                 <div class="flex-1 min-w-0 pr-2">
                   <span class="text-[10px] font-bold ${cc.split(" ")[0]} mr-1.5 font-mono">#${i + 1}</span>
                   <span class="text-xs font-medium text-slate-200 truncate block">${displayName}</span>
-                  ${displayArtist ? `<span class="text-[10px] text-slate-500 block mt-0.5">• ${displayArtist}</span>` : ""}
-                  <span class="text-[9px] text-slate-600 block mt-0.5 font-mono">ID:${songId}</span>
+                  <span class="text-[10px] text-slate-500 block mt-0.5">${displayArtist ? `• ${displayArtist}` : ""}${item.emergente ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>` : ""}</span>
                 </div>
                 <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span class="text-[10px] px-1.5 py-0.5 ${cc.split(" ")[1]} rounded font-mono">${formatScore(score)}</span>
@@ -576,7 +624,7 @@
           const res = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: msg }),
+            body: JSON.stringify({ message: msg, session_id: sessionId }),
           });
           const data = await res.json();
           if (data.error) {
@@ -589,6 +637,7 @@
             addMessage(data.response, false, {
               module2_retrieval: data.module2_retrieval,
               module3_reranked: data.module3_reranked,
+              llm: data.llm,
             });
             showToast("RESPONSE_READY", "success");
           }
@@ -606,7 +655,9 @@
           const res = await fetch("/api/health", { cache: "no-store" });
           const data = await res.json();
           if (data.status === "ok") {
-            statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${data.modules.hf_api.toUpperCase()}`;
+            const motor = data.modules.llm || data.modules.hf_api || "ONLINE";
+            const corto = String(motor).split(" · ")[0].slice(0, 24);
+            statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${escapeHtml(corto).toUpperCase()}`;
             showToast("SYSTEM_ONLINE", "success");
           }
         } catch (e) {

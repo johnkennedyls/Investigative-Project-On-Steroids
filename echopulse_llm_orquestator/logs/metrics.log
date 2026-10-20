@@ -85,3 +85,147 @@
 2026-04-14 12:45:30,309 | INFO | 127.0.0.1 - - [14/Apr/2026 12:45:30] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
 2026-04-14 12:46:10,089 | INFO | 127.0.0.1 - - [14/Apr/2026 12:46:10] "POST /api/chat HTTP/1.1" 200 -
 2026-04-14 12:48:55,463 | INFO | 127.0.0.1 - - [14/Apr/2026 12:48:55] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 07:56:09,552 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 07:56:09,563 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 07:56:25,927 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:25] "GET / HTTP/1.1" 200 -
+2026-10-20 07:56:27,226 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:27] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 07:56:27,462 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:27] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-10-20 07:56:40,244 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:40] "GET / HTTP/1.1" 200 -
+2026-10-20 07:56:41,848 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:41] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 07:56:42,248 | INFO | 127.0.0.1 - - [20/Oct/2026 07:56:42] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-10-20 07:57:11,187 | INFO | 127.0.0.1 - - [20/Oct/2026 07:57:11] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 07:59:11,183 | INFO | 127.0.0.1 - - [20/Oct/2026 07:59:11] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:28:39,809 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 09:28:39,823 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 09:29:21,170 | INFO | 127.0.0.1 - - [20/Oct/2026 09:29:21] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 09:29:50,525 | INFO | 127.0.0.1 - - [20/Oct/2026 09:29:50] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:34:20,908 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 09:34:20,909 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 09:35:00,668 | INFO | 127.0.0.1 - - [20/Oct/2026 09:35:00] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:35:34,451 | INFO | 127.0.0.1 - - [20/Oct/2026 09:35:34] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:36:35,772 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 09:36:35,773 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 09:37:14,293 | INFO | 127.0.0.1 - - [20/Oct/2026 09:37:14] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:37:27,786 | INFO | 127.0.0.1 - - [20/Oct/2026 09:37:27] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:39:37,526 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 09:39:37,527 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 09:39:50,549 | INFO | 127.0.0.1 - - [20/Oct/2026 09:39:50] "GET / HTTP/1.1" 200 -
+2026-10-20 09:39:51,436 | INFO | 127.0.0.1 - - [20/Oct/2026 09:39:51] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 09:40:16,734 | INFO | 127.0.0.1 - - [20/Oct/2026 09:40:16] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 09:51:38,399 | INFO | 127.0.0.1 - - [20/Oct/2026 09:51:38] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:12:34,398 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:12:34,398 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:12:55,889 | INFO | 127.0.0.1 - - [20/Oct/2026 10:12:55] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 10:13:40,235 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:13:40,235 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:14:00,424 | INFO | 127.0.0.1 - - [20/Oct/2026 10:14:00] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 10:14:14,295 | INFO | 127.0.0.1 - - [20/Oct/2026 10:14:14] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:14:20,781 | INFO | 127.0.0.1 - - [20/Oct/2026 10:14:20] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:16:51,666 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:16:51,667 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:17:18,092 | INFO | 127.0.0.1 - - [20/Oct/2026 10:17:18] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 10:17:35,316 | INFO | 127.0.0.1 - - [20/Oct/2026 10:17:35] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:17:44,546 | INFO | 127.0.0.1 - - [20/Oct/2026 10:17:44] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:17:44,593 | INFO | 127.0.0.1 - - [20/Oct/2026 10:17:44] "[35m[1mPOST /api/chat HTTP/1.1[0m" 500 -
+2026-10-20 10:18:19,976 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:18:20,021 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:18:51,431 | INFO | 127.0.0.1 - - [20/Oct/2026 10:18:51] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:19:02,187 | INFO | 127.0.0.1 - - [20/Oct/2026 10:19:02] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:19:26,650 | INFO | 127.0.0.1 - - [20/Oct/2026 10:19:26] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:19:50,797 | INFO | 127.0.0.1 - - [20/Oct/2026 10:19:50] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:21:21,785 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:21:21,786 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:21:54,956 | INFO | 127.0.0.1 - - [20/Oct/2026 10:21:54] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:22:05,842 | INFO | 127.0.0.1 - - [20/Oct/2026 10:22:05] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:22:17,393 | INFO | 127.0.0.1 - - [20/Oct/2026 10:22:17] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:22:30,215 | INFO | 127.0.0.1 - - [20/Oct/2026 10:22:30] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:28:17,616 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5056
+ * Running on http://192.168.101.71:5056
+2026-10-20 10:28:17,617 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:28:46,373 | INFO | 127.0.0.1 - - [20/Oct/2026 10:28:46] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:28:46,652 | INFO | 127.0.0.1 - - [20/Oct/2026 10:28:46] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:28:46,910 | INFO | 127.0.0.1 - - [20/Oct/2026 10:28:46] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:28:47,243 | INFO | 127.0.0.1 - - [20/Oct/2026 10:28:47] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:29:49,339 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5055
+ * Running on http://192.168.101.71:5055
+2026-10-20 10:29:49,339 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:30:19,957 | INFO | 127.0.0.1 - - [20/Oct/2026 10:30:19] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 10:30:27,409 | INFO | 127.0.0.1 - - [20/Oct/2026 10:30:27] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 10:53:51,749 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 10:53:51,756 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 10:53:59,497 | INFO | 127.0.0.1 - - [20/Oct/2026 10:53:59] "GET / HTTP/1.1" 200 -
+2026-10-20 10:54:00,094 | INFO | 127.0.0.1 - - [20/Oct/2026 10:54:00] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 10:54:39,942 | INFO | 127.0.0.1 - - [20/Oct/2026 10:54:39] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:07:03,841 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 11:07:03,842 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 11:07:44,742 | INFO | 127.0.0.1 - - [20/Oct/2026 11:07:44] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:23:12,205 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 11:23:12,323 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 11:23:31,238 | INFO | 127.0.0.1 - - [20/Oct/2026 11:23:31] "GET / HTTP/1.1" 200 -
+2026-10-20 11:23:31,658 | INFO | 127.0.0.1 - - [20/Oct/2026 11:23:31] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 11:23:38,996 | INFO | 127.0.0.1 - - [20/Oct/2026 11:23:38] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:24:27,474 | INFO | 127.0.0.1 - - [20/Oct/2026 11:24:27] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:37:22,472 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 11:37:22,473 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 11:38:09,239 | INFO | 127.0.0.1 - - [20/Oct/2026 11:38:09] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:38:45,201 | INFO | 127.0.0.1 - - [20/Oct/2026 11:38:45] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 11:41:38,559 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 11:41:38,560 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 11:42:21,644 | INFO | 127.0.0.1 - - [20/Oct/2026 11:42:21] "POST /api/chat HTTP/1.1" 200 -
+2026-10-20 12:02:17,278 | INFO | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.101.71:5000
+2026-10-20 12:02:17,278 | INFO | [33mPress CTRL+C to quit[0m
+2026-10-20 12:02:21,159 | INFO | 127.0.0.1 - - [20/Oct/2026 12:02:21] "GET / HTTP/1.1" 200 -
+2026-10-20 12:02:21,948 | INFO | 127.0.0.1 - - [20/Oct/2026 12:02:21] "GET /api/health HTTP/1.1" 200 -
+2026-10-20 12:02:53,603 | INFO | 127.0.0.1 - - [20/Oct/2026 12:02:53] "POST /api/chat HTTP/1.1" 200 -

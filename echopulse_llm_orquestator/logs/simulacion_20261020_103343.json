@@ -1,0 +1,76 @@
+{
+  "filas": [
+    {
+      "turno": 1,
+      "mensaje": "Hola, ando con el ánimo bajito hoy",
+      "respuesta": "¡Eso suena muy triste! Intentaré ser de ayuda. Para que no se pierda, mis apuestas de esta tanda son «we cant stop» de miley cyrus y «out of the woods» de taylor swift. ¿Tienes alguna canción en particular que te gustaría escuchar?",
+      "query_en": "sad melancholic",
+      "voz": "ollama",
+      "latencia_ms": 6599.0,
+      "top_m3": [
+        "we cant stop",
+        "out of the woods",
+        "all summer long"
+      ]
+    },
+    {
+      "turno": 2,
+      "mensaje": "Algo más animado, por favor",
+      "respuesta": "Claro, ¿has escuchado «thoughts from a balcony» de Mac Miller? Es muy relajante y tranquilo. También hay «since youre gone» de The Cars que es muy pegajoso. ¿Te suena para ahora mismo o lo guardamos para otro momento?",
+      "query_en": "energetic motivational",
+      "voz": "ollama",
+      "latencia_ms": 9809.3,
+      "top_m3": [
+        "planetary duality ii a prophecies fruition",
+        "you be the anchor that keeps my feet on the ground ill be the wings that keep your heart in the clouds",
+        "thoughts from a balcony"
+      ]
+    },
+    {
+      "turno": 3,
+      "mensaje": "Y si quieres algo de rock pesado para descargar",
+      "respuesta": "¡Por supuesto! Para ese tipo de mood, «rock or bust» de AC/DC sería perfecta. Aquí tienes, espero que te diviertas. ¿Quieres que tire más hacia ese artista o que te sorprenda con algo distinto?",
+      "query_en": "rock guitar",
+      "voz": "ollama",
+      "latencia_ms": 8724.8,
+      "top_m3": [
+        "rock or bust",
+        "going down",
+        "green onions"
+      ]
+    },
+    {
+      "turno": 4,
+      "mensaje": "¿Tú qué preferirías si el artista es nuevo para mí?",
+      "respuesta": "Es muy emocionante y tiene un ritmo muy pegajoso. Para que no se pierda, mis apuestas de esta tanda son «johnny strikes up the band» de warren zevon y «our way to fall» de yo la tengo. ¿Te animas a probar una de estas dos?",
+      "query_en": "rock guitar",
+      "voz": "ollama",
+      "latencia_ms": 12008.6,
+      "top_m3": [
+        "johnny strikes up the band",
+        "our way to fall",
+        "spoonful"
+      ]
+    },
+    {
+      "turno": 5,
+      "mensaje": "Perfecto, mándame otra tanda parecida",
+      "respuesta": "¡Por supuesto! ¿Habías escuchado «the other side of life» de The Moody Blues? Es muy melancólico, pero tiene un ritmo suave que se alinea con tu estado de ánimo. ¿Te animas a probar algo más de este artista o te gustaría algo diferente?",
+      "query_en": "rock guitar",
+      "voz": "ollama",
+      "latencia_ms": 14350.2,
+      "top_m3": [
+        "amanda",
+        "dub marcus say",
+        "you hurt me"
+      ]
+    }
+  ],
+  "resumen": {
+    "turnos": 5,
+    "preguntas": 5,
+    "citas": 5,
+    "canciones_distintas": 50,
+    "repeticiones": 0
+  }
+}
