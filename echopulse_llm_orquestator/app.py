@@ -492,8 +492,10 @@ def health():
 def get_metrics(): return jsonify(metrics.get_summary())
 
 if __name__ == "__main__":
-    print(f"🚀 EchoPulse AI iniciando en http://localhost:5000")
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    print(f"🚀 EchoPulse AI iniciando en http://localhost:{port}")
     print(f"💻 Device: {module2.device}")
     print(f"📊 Métricas habilitadas en {LOGS_DIR}")
     print(f"🔄 Flujo corregido: Módulo 2 (Retrieval) → Módulo 3 (Re-ranking)")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=debug, host="0.0.0.0", port=port)
