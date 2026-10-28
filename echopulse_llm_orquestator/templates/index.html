@@ -101,11 +101,12 @@
             href="{{ encuesta_url }}"
             target="_blank"
             rel="noopener"
-            class="px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 rounded-lg border border-slate-700/50 transition flex items-center gap-1.5"
+            aria-label="Encuesta de evaluación de la tesis"
+            class="px-2.5 py-1.5 text-xs text-blue-300 bg-blue-500/15 hover:bg-blue-500/25 rounded-lg border border-blue-500/25 transition flex items-center gap-1.5"
             title="Encuesta de la tesis: 20 preguntas cortas, no pide conocimientos técnicos"
           >
             <i class="fas fa-clipboard-list text-[10px]"></i>
-            <span class="hidden sm:inline">Encuesta</span>
+            Encuesta
           </a>
           <button
             onclick="nuevaConversacion()"
@@ -113,7 +114,7 @@
             title="Empezar una conversación desde cero"
           >
             <i class="fas fa-rotate-left text-[10px]"></i>
-            Nueva conversación
+            <span class="hidden sm:inline">Nueva conversación</span>
           </button>
           <span
             id="status"
@@ -444,6 +445,10 @@
       let sessionId = almacen.leer("echopulse_session") || idSesion();
       almacen.escribir("echopulse_session", sessionId);
 
+      // Cuestionario de la tesis: lo sirve Flask (`ENCUESTA_URL`) y se enlaza desde
+      // el pie de cada tanda, donde el visitante ya probó el agente.
+      const ENCUESTA_URL = {{ encuesta_url | tojson }};
+
       // ngrok, el túnel HTTPS de la demo, muestra a los navegadores una página de
       // aviso antes de dejar pasar. Un fetch normal recibiría ese HTML donde espera
       // JSON y la app fallaría al parsearlo; esta cabecera hace que ngrok lo salte.
@@ -669,6 +674,7 @@
             <button data-fb="gust" data-turno="${escapeHtml(turnoId)}" class="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 rounded text-emerald-300 transition" title="Sí, me gusta lo que suena">👍 Me gusta</button>
             <button data-fb="no_gust" data-turno="${escapeHtml(turnoId)}" class="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 rounded text-rose-300 transition" title="No, busco otra cosa">👎 No</button>
             <span class="fb-estado" data-estado="${escapeHtml(turnoId)}"></span>
+            <a href="${escapeHtml(ENCUESTA_URL)}" target="_blank" rel="noopener" class="ml-auto text-blue-400 hover:text-blue-300 underline decoration-blue-500/40" title="20 preguntas cortas, sin conocimientos técnicos">📝 Encuesta (3 min)</a>
           </div>`;
         }
         const ev = metadata?.evaluacion;
