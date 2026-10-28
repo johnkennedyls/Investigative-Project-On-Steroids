@@ -151,6 +151,46 @@
               ><span id="metric-coverage" class="text-blue-400 ml-1">-</span>
             </div>
           </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+            <div>
+              <span class="text-slate-500">Cobertura M3:</span
+              ><span
+                id="metric-m3"
+                class="text-amber-400 ml-1"
+                title="Porcentaje de las candidatas que el Módulo 3 reconoce como clase propia. Por debajo de 100% el re-ranking solo ordena por el Módulo 2."
+                >-</span
+              >
+            </div>
+            <div>
+              <span class="text-slate-500">P90:</span
+              ><span id="metric-p90" class="text-cyan-400 ml-1">-</span>
+            </div>
+            <div>
+              <span class="text-slate-500">Artistas/tanda:</span
+              ><span
+                id="metric-diversidad"
+                class="text-violet-400 ml-1"
+                title="Artistas distintos promedio por tanda de 10: mide diversidad, no acierto."
+                >-</span
+              >
+            </div>
+            <div>
+              <span class="text-slate-500">Respaldos LLM:</span
+              ><span
+                id="metric-fallback"
+                class="text-rose-400 ml-1"
+                title="Turnos resueltos por el motor determinista (sin LLM o porque su salida no era aprovechable)."
+                >-</span
+              >
+            </div>
+          </div>
+          <p class="mt-2 text-[10px] text-slate-600 leading-relaxed">
+            Telemetría operativa y de pipeline. Hit Rate@K, Recall@K,
+            Precision@K, MRR y NDCG@K no se calculan aquí: necesitan etiquetas
+            de relevancia y se obtienen cruzando
+            <code>logs/events_*.jsonl</code> con
+            <code>logs/feedback_*.jsonl</code> (los botones 👍/👎 de cada tanda).
+          </p>
           <button
             onclick="refreshMetrics()"
             class="mt-2 px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 rounded text-[10px] text-blue-300 border border-blue-500/25"
@@ -240,6 +280,11 @@
             <p class="text-slate-500 mt-1.5 text-xs">
               Arquitectura corregida: Módulo 2 (Retrieval) → Módulo 3
               (Re-ranking semántico).
+            </p>
+            <p class="text-slate-500 mt-1.5 text-xs leading-snug">
+              Demo de tesis: los 👍/👎 que des se guardan como etiquetas de
+              relevancia para calcular Hit Rate, MRR y NDCG. Un turno tarda ~7 s
+              (Qwen en CPU) y hay un tope de 12 consultas por minuto.
             </p>
             <div class="flex flex-wrap gap-1.5 mt-2.5">
               <button
@@ -347,12 +392,35 @@
       let loading = false,
         metricsInterval = null;
 
-      // Sesión de conversación: persiste en el navegador y la recuerda el backend
-      let sessionId = localStorage.getItem("echopulse_session");
-      if (!sessionId) {
-        sessionId = crypto.randomUUID();
-        localStorage.setItem("echopulse_session", sessionId);
+      // La demo se sirve en http://IP (sin dominio), que NO es un contexto seguro:
+      // ahí el navegador no expone crypto.randomUUID y, según la configuración de
+      // sitio, también niega localStorage. Sin estos reemplazos el script moría en
+      // la primera línea y la página quedaba sin responder al botón Enviar.
+      function idSesion() {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
       }
+      const almacen = {
+        leer(clave) {
+          try {
+            return localStorage.getItem(clave);
+          } catch (e) {
+            return null;
+          }
+        },
+        escribir(clave, valor) {
+          try {
+            localStorage.setItem(clave, valor);
+          } catch (e) {
+            /* sin persistencia: la sesión vive solo en esta pestaña */
+          }
+        },
+      };
+
+      // Sesión de conversación: persiste en el navegador y la recuerda el backend
+      let sessionId = almacen.leer("echopulse_session") || idSesion();
+      almacen.escribir("echopulse_session", sessionId);
 
       async function nuevaConversacion() {
         try {
@@ -362,8 +430,8 @@
             body: JSON.stringify({ session_id: sessionId }),
           });
         } catch (e) {}
-        sessionId = crypto.randomUUID();
-        localStorage.setItem("echopulse_session", sessionId);
+        sessionId = idSesion();
+        almacen.escribir("echopulse_session", sessionId);
         chat.innerHTML = "";
         addMessage(
           "Nueva conversación iniciada. ¿En qué mood estás? Cuéntame qué necesitas y te recomiendo.",
@@ -422,6 +490,16 @@
               : "-";
           document.getElementById("metric-coverage").textContent =
             `${(data.metadata_coverage || 0).toFixed(1)}%`;
+          document.getElementById("metric-m3").textContent =
+            `${(data.m3_coverage || 0).toFixed(0)}%`;
+          document.getElementById("metric-p90").textContent =
+            data.latency_p90_ms ? `${data.latency_p90_ms.toFixed(0)}ms` : "-";
+          document.getElementById("metric-diversidad").textContent =
+            data.artistas_distintos_promedio
+              ? data.artistas_distintos_promedio.toFixed(1)
+              : "-";
+          document.getElementById("metric-fallback").textContent =
+            `${data.respuestas_deterministas || 0}/${data.total_queries || 0}`;
         } catch (e) {
           console.warn("No se pudieron cargar métricas:", e);
         }
@@ -449,7 +527,74 @@
         );
       }
 
-      function addMessage(text, isUser = false, metadata = null) {
+      // Metadatos de cada turno, indexados por el id del evento que devuelve
+      // el backend. Antes se incrustaba JSON.stringify(metadata) dentro de un
+      // onclick="…": un título con comillas rompía el atributo y cualquier
+      // nombre del catálogo podía inyectar JS en la página.
+      const TURNOS = new Map();
+
+      function cancionVisible(song) {
+        const nombre =
+          song.track_name && String(song.track_name).toLowerCase() !== "unknown"
+            ? song.track_name
+            : "";
+        return nombre;
+      }
+
+      function generoVisible(song) {
+        // `generos` es el conjunto canónico de las tres columnas de género del
+        // catálogo, ordenado con el género pedido primero: "rock · blues" en vez
+        // de un `genre_lyr` suelto que dice "blues" de una canción que sí es rock.
+        const lista = Array.isArray(song.generos)
+          ? song.generos.filter(Boolean).slice(0, 2)
+          : [];
+        const texto = lista.length
+          ? lista.join(" · ")
+          : song.genre && String(song.genre).toLowerCase() !== "unknown"
+            ? song.genre
+            : "";
+        return texto
+          ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-300/80 border border-cyan-500/20 align-middle">${escapeHtml(texto)}</span>`
+          : "";
+      }
+
+      function tarjetaCancion(song, { rank = false, score = null } = {}) {
+        const nombre = cancionVisible(song);
+        const artista =
+          song.artist_name && String(song.artist_name).toLowerCase() !== "unknown"
+            ? song.artist_name
+            : "";
+        // Sin título real no hay canción que mostrar: se dice como hueco del
+        // catálogo y no se enlaza a una búsqueda genérica de YouTube.
+        const titulo = nombre
+          ? escapeHtml(nombre)
+          : `<span class="italic text-slate-500">Título no registrado en el catálogo${
+              song.genre ? ` · ${escapeHtml(song.genre)}` : ""
+            }</span>`;
+        const puntaje =
+          score != null
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${score.color || "bg-blue-500/15 text-blue-300"}">${escapeHtml(score.texto)}</span>`
+            : "";
+        const enlaces =
+          nombre || artista
+            ? `${song.spotify_url && nombre ? `<a href="${escapeHtml(song.spotify_url)}" target="_blank" rel="noopener" class="p-1.5 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Abrir en Spotify"><i class="fab fa-spotify text-[10px]"></i></a>` : ""}
+             ${song.youtube_url && nombre ? `<a href="${escapeHtml(song.youtube_url)}" target="_blank" rel="noopener" class="p-1.5 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="Buscar en YouTube"><i class="fab fa-youtube text-[10px]"></i></a>` : ""}`
+            : "";
+        return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/40 rounded border border-slate-700/40">
+          <div class="flex-1 min-w-0 pr-2">
+            ${rank ? `<span class="text-[10px] font-bold mr-1.5 font-mono ${score ? score.clase : "text-blue-400"}">#${escapeHtml(song.rank)}</span>` : ""}
+            <span class="text-xs font-medium text-slate-200 truncate block">${titulo}</span>
+            <span class="text-[10px] text-slate-500">${artista ? `• ${escapeHtml(artista)}` : ""}${generoVisible(song)}${
+              song.emergente
+                ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>`
+                : ""
+            }</span>
+          </div>
+          <div class="flex items-center gap-1.5 flex-shrink-0">${puntaje}<div class="flex gap-1">${enlaces}</div></div>
+        </div>`;
+      }
+
+      function addMessage(text, isUser = false, metadata = null, turnoId = null) {
         const div = document.createElement("div");
         div.className = `flex gap-2.5 fade-in ${isUser ? "flex-row-reverse" : ""}`;
         const avatar = isUser
@@ -460,38 +605,40 @@
           : "bg-slate-800/50 border-slate-700/50 rounded-tl-none";
 
         let extra = "";
+        if (turnoId) TURNOS.set(turnoId, metadata);
         if (
           metadata?.module2_retrieval?.length ||
           metadata?.module3_reranked?.length
         ) {
-          extra = `<button onclick="showResults(${JSON.stringify(metadata).replace(/"/g, "&quot;")})" class="mt-2.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 rounded text-[10px] transition text-blue-300">Ver top 10 completo</button>`;
+          extra = `<button data-ver="${escapeHtml(turnoId)}" class="mt-2.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 rounded text-[10px] transition text-blue-300">Ver top 10 completo</button>`;
         }
         // Las recomendaciones finales siempre vienen del re-ranker (Módulo 3)
         if (metadata?.module3_reranked?.length) {
-          const top3 = metadata.module3_reranked.slice(0, 3);
-          const cards = top3
-            .map((song) => {
-              const name =
-                song.track_name && song.track_name !== "Unknown"
-                  ? song.track_name
-                  : "Canción recomendada";
-              const artist =
-                song.artist_name && song.artist_name !== "Unknown"
-                  ? song.artist_name
-                  : "";
-              return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/40 rounded border border-slate-700/40">
-              <div class="flex-1 min-w-0 pr-2">
-                <span class="text-xs font-medium text-slate-200 truncate block">${escapeHtml(name)}</span>
-                <span class="text-[10px] text-slate-500">${artist ? `• ${escapeHtml(artist)}` : ""}${song.emergente ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>` : ""}</span>
-              </div>
-              <div class="flex gap-1 flex-shrink-0">
-                ${song.spotify_url ? `<a href="${escapeHtml(song.spotify_url)}" target="_blank" class="p-1.5 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Abrir en Spotify"><i class="fab fa-spotify text-[10px]"></i></a>` : ""}
-                ${song.youtube_url ? `<a href="${escapeHtml(song.youtube_url)}" target="_blank" class="p-1.5 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="Buscar en YouTube"><i class="fab fa-youtube text-[10px]"></i></a>` : ""}
-              </div>
-            </div>`;
-            })
+          const cards = metadata.module3_reranked
+            .slice(0, 3)
+            .map((song) => tarjetaCancion(song))
             .join("");
           extra += `<div class="mt-2.5 pt-2.5 border-t border-slate-700/40"><p class="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Recomendaciones para ti</p><div class="space-y-1.5">${cards}</div></div>`;
+          // 👍/👎: la única ground truth de la demo. Sin etiquetas no hay
+          // Hit Rate / MRR / NDCG que reportar en la tesis.
+          extra += `<div class="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
+            <span>¿Te sirve esta tanda?</span>
+            <button data-fb="gust" data-turno="${escapeHtml(turnoId)}" class="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 rounded text-emerald-300 transition" title="Sí, me gusta lo que suena">👍 Me gusta</button>
+            <button data-fb="no_gust" data-turno="${escapeHtml(turnoId)}" class="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/25 rounded text-rose-300 transition" title="No, busco otra cosa">👎 No</button>
+            <span class="fb-estado" data-estado="${escapeHtml(turnoId)}"></span>
+          </div>`;
+        }
+        const ev = metadata?.evaluacion;
+        if (ev) {
+          const notas = [];
+          if (ev.cobertura_m3 === 0)
+            notas.push("el Módulo 3 no tiene clase propia para ninguna candidata (la tanda se ordenó solo por el Módulo 2)");
+          else if (ev.cobertura_m3 < 0.5)
+            notas.push(`cobertura del Módulo 3 ${(ev.cobertura_m3 * 100).toFixed(0)}%`);
+          if (ev.metadata_coverage < 1)
+            notas.push(`${Math.round((1 - ev.metadata_coverage) * 10)} sin título registrado`);
+          if (notas.length)
+            extra += `<p class="mt-1.5 text-[9px] font-mono text-amber-500/80 leading-snug">NOTA EVAL · ${escapeHtml(notas.join(" · "))}</p>`;
         }
         // Con qué motor respondió (Qwen local, endpoint, o modo determinista)
         if (metadata?.llm?.etiqueta) {
@@ -499,12 +646,49 @@
             metadata.llm.proveedor === "determinista"
               ? "MODO DETERMINISTA (sin LLM)"
               : metadata.llm.etiqueta.toUpperCase();
-          extra += `<p class="mt-2 text-[9px] font-mono text-slate-600 uppercase tracking-wider">VOZ :: ${escapeHtml(motor)}</p>`;
+          extra += `<p class="mt-2 text-[9px] font-mono text-slate-600 uppercase tracking-wider">VOZ :: ${escapeHtml(motor)}${
+            metadata.llm.rechazada ? " · SALIDA RECHAZADA" : ""
+          }</p>`;
         }
         div.innerHTML = `${avatar}<div class="${bg} rounded-lg p-3.5 max-w-[85%] border"><p class="text-slate-200 text-sm leading-relaxed">${escapeHtml(text)}</p>${extra}</div>`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
       }
+
+      async function enviarFeedback(boton) {
+        const turnoId = boton.dataset.turno;
+        const valor = boton.dataset.fb;
+        const registro = TURNOS.get(turnoId) || {};
+        const primera =
+          registro.module3_reranked?.find((c) => cancionVisible(c)) || {};
+        try {
+          const res = await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              session_id: sessionId,
+              evento_id: turnoId,
+              valor,
+              track_name: primera.track_name || "",
+            }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const estado = chat.querySelector(
+            `[data-estado="${CSS.escape(turnoId)}"]`,
+          );
+          if (estado) estado.textContent = "registrado ✓";
+          showToast("FEEDBACK_LISTO", "success");
+        } catch (e) {
+          showToast("No se pudo registrar tu respuesta", "error");
+        }
+      }
+
+      chat.addEventListener("click", (e) => {
+        const ver = e.target.closest("[data-ver]");
+        if (ver) return showResults(ver.dataset.ver);
+        const fb = e.target.closest("[data-fb]");
+        if (fb && !fb.disabled) enviarFeedback(fb);
+      });
 
       function setLoading(state) {
         loading = state;
@@ -551,12 +735,13 @@
         pipelineStatus.textContent = "IDLE";
       }
 
-      function showResults(metadata) {
+      function showResults(turnoId) {
+        const metadata = TURNOS.get(turnoId) || {};
         const modal = document.getElementById("modal"),
           content = document.getElementById("modal-content");
         const renderList = (items, title, color, icon) => {
           if (!items || items.length === 0)
-            return `<div class="p-3 bg-slate-800/40 rounded border border-slate-700/40 text-slate-500 text-center text-xs font-mono">${title}: NO_RESULTS</div>`;
+            return `<div class="p-3 bg-slate-800/40 rounded border border-slate-700/40 text-slate-500 text-center text-xs font-mono">${escapeHtml(title)}: NO_RESULTS</div>`;
           const cc =
             {
               blue: "text-blue-400 bg-blue-500/15 border-blue-500/25",
@@ -566,38 +751,46 @@
               amber: "text-amber-400 bg-amber-500/15 border-amber-500/25",
             }[color] || "text-blue-400 bg-blue-500/15 border-blue-500/25";
           return `<div class="p-3 bg-slate-800/40 rounded border border-slate-700/40">
-            <h4 class="font-medium ${cc.split(" ")[0]} mb-2.5 flex items-center gap-1.5 text-xs font-mono"><i class="${icon}"></i> ${title}</h4>
+            <h4 class="font-medium ${cc.split(" ")[0]} mb-2.5 flex items-center gap-1.5 text-xs font-mono"><i class="${escapeHtml(icon)}"></i> ${escapeHtml(title)}</h4>
             <div class="space-y-1.5">${items
               .map((item, i) => {
-                const hasName =
-                    item.track_name && item.track_name !== "Unknown",
-                  hasArtist =
-                    item.artist_name && item.artist_name !== "Unknown";
-                const displayName = hasName ? item.track_name : "Canción recomendada";
-                const displayArtist = hasArtist ? item.artist_name : "";
                 const score =
                   item.final_score !== undefined
                     ? item.final_score
                     : item.similarity !== undefined
                       ? item.similarity
                       : 0;
+                const intent =
+                  item.intent_conocida === false
+                    ? `<span class="text-[9px] text-slate-600 font-mono mr-1">M3 sin clase</span>`
+                    : "";
                 return `<div class="song-card flex items-center justify-between p-2 bg-slate-800/30 rounded border border-slate-700/30">
                 <div class="flex-1 min-w-0 pr-2">
                   <span class="text-[10px] font-bold ${cc.split(" ")[0]} mr-1.5 font-mono">#${i + 1}</span>
-                  <span class="text-xs font-medium text-slate-200 truncate block">${displayName}</span>
-                  <span class="text-[10px] text-slate-500 block mt-0.5">${displayArtist ? `• ${displayArtist}` : ""}${item.emergente ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>` : ""}</span>
+                  <span class="text-xs font-medium text-slate-200 truncate block">${cancionVisible(item) ? escapeHtml(item.track_name) : `<span class="italic text-slate-500">Título no registrado en el catálogo${item.genre ? ` · ${escapeHtml(item.genre)}` : ""}</span>`}</span>
+                  <span class="text-[10px] text-slate-500 block mt-0.5">${item.artist_name && item.artist_name !== "Unknown" ? `• ${escapeHtml(item.artist_name)}` : ""}${generoVisible(item)}${item.emergente ? `<span class="ml-1.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 align-middle" title="Artista sin señal de fama en el catálogo — descubierto junto a los reconocidos">Emergente</span>` : ""}${intent}</span>
                 </div>
                 <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span class="text-[10px] px-1.5 py-0.5 ${cc.split(" ")[1]} rounded font-mono">${formatScore(score)}</span>
-                  <div class="flex gap-1">${item.spotify_url ? `<a href="${item.spotify_url}" target="_blank" class="p-1 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Spotify"><i class="fab fa-spotify text-[9px]"></i></a>` : ""}
-                  ${item.youtube_url ? `<a href="${item.youtube_url}" target="_blank" class="p-1 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="YouTube"><i class="fab fa-youtube text-[9px]"></i></a>` : ""}</div>
+                  <div class="flex gap-1">${cancionVisible(item) && item.spotify_url ? `<a href="${escapeHtml(item.spotify_url)}" target="_blank" rel="noopener" class="p-1 bg-green-500/15 hover:bg-green-500/25 rounded text-green-400 transition" title="Spotify"><i class="fab fa-spotify text-[9px]"></i></a>` : ""}
+                  ${cancionVisible(item) && item.youtube_url ? `<a href="${escapeHtml(item.youtube_url)}" target="_blank" rel="noopener" class="p-1 bg-red-500/15 hover:bg-red-500/25 rounded text-red-400 transition" title="YouTube"><i class="fab fa-youtube text-[9px]"></i></a>` : ""}</div>
                 </div>
               </div>`;
               })
               .join("")}</div></div>`;
         };
+        const ev = metadata.evaluacion;
+        const cabecera = ev
+          ? `<div class="p-2.5 mb-2 bg-slate-800/60 rounded border border-slate-700/50 text-[10px] font-mono text-slate-400 leading-relaxed">
+              EVENTO ${escapeHtml(ev.id)} · intención "${escapeHtml(metadata.query_en || "")}" ·
+              cobertura M3 ${((ev.cobertura_m3 || 0) * 100).toFixed(0)}% ·
+              perfil ${escapeHtml(ev.perfil || "sin perfil")} ·
+              ${ev.emergentes} emergentes / ${ev.reconocidos} reconocidos ·
+              ${ev.artistas_distintos} artistas distintos
+            </div>`
+          : "";
         // ✅ ORDEN CORREGIDO: Primero Retrieval (M2), luego Re-ranking (M3)
-        content.innerHTML = `${renderList(metadata.module2_retrieval, "MODULE_2 :: MST_MR_RETRIEVAL", "blue", "fas fa-database")}${renderList(metadata.module3_reranked, "MODULE_3 :: INTENT_RERANK", "emerald", "fas fa-brain")}`;
+        content.innerHTML = `${cabecera}${renderList(metadata.module2_retrieval, "MODULE_2 :: MST_MR_RETRIEVAL", "blue", "fas fa-database")}${renderList(metadata.module3_reranked, "MODULE_3 :: INTENT_RERANK", "emerald", "fas fa-brain")}`;
         modal.classList.remove("hidden");
         showToast("RESULTS_LOADED", "success");
       }
@@ -634,11 +827,18 @@
             if (data.stages) updatePipeline(data.stages);
             pipelineStatus.textContent = "COMPLETE";
             // ✅ PASAR CLAVES CORREGIDAS
-            addMessage(data.response, false, {
-              module2_retrieval: data.module2_retrieval,
-              module3_reranked: data.module3_reranked,
-              llm: data.llm,
-            });
+            addMessage(
+              data.response,
+              false,
+              {
+                module2_retrieval: data.module2_retrieval,
+                module3_reranked: data.module3_reranked,
+                llm: data.llm,
+                evaluacion: data.evaluacion,
+                query_en: data.query_en,
+              },
+              data.evaluacion?.id || `turno-${Date.now()}`,
+            );
             showToast("RESPONSE_READY", "success");
           }
         } catch (err) {

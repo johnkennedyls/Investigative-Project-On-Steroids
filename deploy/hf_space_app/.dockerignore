@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.log
+logs/
+.env
+.env.*
+.git/
+.gitignore
+*.md
+!README.md
+deploy/
+docs/
+scripts/
+models/
+tabla_maestra/
+data/
+build/

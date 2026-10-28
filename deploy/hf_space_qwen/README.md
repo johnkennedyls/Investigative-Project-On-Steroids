@@ -6,45 +6,59 @@ colorTo: purple
 sdk: docker
 app_port: 7860
 pinned: false
+short_description: Qwen con llama.cpp para EchoPulse AI
 ---
 
 # Qwen gratis para EchoPulse (Hugging Face Space)
 
-Este Space expone **Qwen2.5-3B-Instruct** (GGUF Q4_K_M, el repo oficial
-`Qwen/Qwen2.5-3B-Instruct-GGUF` de Hugging Face) con la API compatible OpenAI
-de `llama.cpp`. Corre en el hardware **gratuito** de Spaces (CPU basic, 2 vCPU,
-16 GB), sin créditos de Inference Providers.
+Este Space expone **Qwen2.5** (GGUF del repo oficial de Hugging Face) con la API
+compatible OpenAI de `llama.cpp`. Corre en el hardware **gratuito** de Spaces
+(CPU basic, 2 vCPU, 16 GB), sin créditos de Inference Providers.
 
 ## Qué devuelve
 
-- `POST /v1/chat/completions` — chat compatible OpenAI (es lo que consume
+- `POST /v1/chat/completions` — chat compatible OpenAI (lo consume
   `echopulse_llm_orquestator/llm_client.py`).
-- `GET /health` — estado del servidor.
+- `GET /health` — estado del servidor (devuelve `{"status":"ok"}` cuando cargó).
 - `GET /v1/models` — lista de modelos.
 
-La primera vez descarga ~1,9 GB del modelo; luego queda cacheado mientras el
-Space siga despierto (los Spaces gratis se duermen por inactividad y al volver
-tardan un par de minutos en recargar).
+## Modelo
+
+Por defecto `Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M` (~1 GB, el más ágil en
+2 vCPU). Para cambiarlo **no hace falta tocar el Dockerfile**: crea en el Space
+una variable `MODELO` (Settings → Variables and secrets):
+
+| `MODELO` | Tamaño | Nota |
+|---|---|---|
+| `Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M` | ~1 GB | por defecto, respuestas en 5-15 s |
+| `Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M` | ~1,9 GB | mejor calidad, más lento |
+| `Qwen/Qwen2.5-0.5B-Instruct-GGUF:Q4_K_M` | ~0,4 GB | solo para pruebas |
+
+El GGUF se descarga al arrancar el contenedor y se cachea en `/tmp/llama-cache`
+durante la vida del Space. **Cold start**: 2-4 minutos la primera vez
+(descarga + carga); después, unos segundos.
 
 ## Conectarlo al agente
 
-En `echopulse_llm_orquestator/.env`:
+En el Space de la app (`echopulse-ai`), Settings → Variables:
 
 ```env
-LLM_BASE_URL=https://<usuario>-<nombre-del-space>.hf.space/v1
-LLM_API_KEY=
+LLM_BASE_URL=https://<tu-usuario>-<este-space>.hf.space/v1
 LLM_MODEL=qwen
 ```
 
-Luego `python app.py` y comprueba con:
+Luego comprueba desde la app:
 
 ```bash
-curl -X POST http://localhost:5000/api/llm/probar
+curl -X POST https://<tu-usuario>-echopulse-ai.hf.space/api/llm/probar
 ```
+
+Debe responder `"proveedor": "custom"`.
+
+> La URL exacta está en el menú **⋮ → Embed this Space** de este Space.
 
 ## Aviso de rendimiento
 
-En CPU básica, Qwen2.5-3B responde a unas pocas palabras por segundo: una
-respuesta de 3 frases puede tardar 10-20 s. Para una demo rápida conviene
-probar `Qwen2.5-1.5B-Instruct-GGUF` (cambiando la variable `MODELO` del
-`Dockerfile`).
+En CPU básica, Qwen2.5-1.5B responde a unas 10-15 palabras por segundo: una
+respuesta de 3 frases tarda 5-15 s. Es suficiente para la demo, pero si
+necesitas respuestas instantáneas usa Groq (Qwen3-32B) como voz del agente.

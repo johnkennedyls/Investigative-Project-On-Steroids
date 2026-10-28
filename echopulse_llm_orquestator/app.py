@@ -27,21 +27,32 @@ import logging
 
 try:
     import conversacion
+    import limite
+    import perfiles
+    import rerank
     from llm_client import ClienteLLM
 except ImportError as exc:  # pragma: no cover - arranque mal configurado
     raise SystemExit(
         f"❌ Faltan módulos del agente ({exc}). Ejecuta app.py desde la carpeta "
-        "echopulse_llm_orquestator/ (necesita llm_client.py y conversacion.py)."
+        "echopulse_llm_orquestator/ (necesita llm_client.py, conversacion.py, "
+        "perfiles.py, rerank.py y limite.py)."
     )
 
 # =====================================================================
 # CONFIGURACIÓN DE LOGGING Y MÉTRICAS
 # =====================================================================
+# BASE_DIR/LOGS_DIR van ANTES del handler: 'logs/metrics.log' relativo al cwd
+# reventaba el arranque si el directorio todavía no existía (Docker, CI).
+BASE_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BASE_DIR / "models"
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(message)s',
     handlers=[
-        logging.FileHandler('logs/metrics.log', encoding='utf-8', mode='a'),
+        logging.FileHandler(LOGS_DIR / "metrics.log", encoding="utf-8", mode="a"),
         logging.StreamHandler()
     ]
 )
@@ -69,21 +80,35 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN or not HF_TOKEN.startswith("hf_"):
     print("ℹ️ Sin HF_TOKEN válido: el router de Hugging Face no se usará (no hace falta).")
 
-BASE_DIR = Path(__file__).resolve().parent
-MODELS_DIR = BASE_DIR / "models"
-LOGS_DIR = BASE_DIR / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
 # =====================================================================
-# 📊 SISTEMA DE MÉTRICAS SIMPLE
+# 📊 MÉTRICAS: telemetría operativa + insumos de evaluación de la tesis
 # =====================================================================
 class SimpleMetrics:
+    """Dos niveles deliberadamente separados.
+
+    * `get_summary()` → operación (latencia, éxito) y CALIDAD DEL PIPELINE
+      (cobertura de metadatos, cobertura del Módulo 3, perfil de ánimo aplicado,
+      diversidad, respaldos del LLM). Son medibles hoy, pero NO son precisión de
+      recomendación: sin etiquetas no hay Hit Rate ni MRR que valga.
+    * `events_file` (JSONL, un evento por turno con el ranking completo, las
+      latencias y la respuesta) → material reproducible para calcular
+      HR/Recall/Precision/MRR/NDCG en cuanto existan relevancias, ya sean del
+      estudio de usuario (`/api/feedback`) o de un dataset etiquetado.
+
+    El JSONL guarda también el texto del usuario y la respuesta del agente: es
+    dato de la demo, no anonimizado, y vive en `logs/` (fuera de Git).
+    """
+
     def __init__(self):
         self.counters = defaultdict(int)
         self.timings = defaultdict(list)
+        self.errors = []
         self._lock = Lock()
-        self.metrics_file = LOGS_DIR / f"metrics_{datetime.now().strftime('%Y-%m')}.jsonl"
-    
+        mes = datetime.now().strftime("%Y-%m")
+        self.metrics_file = LOGS_DIR / f"metrics_{mes}.jsonl"
+        self.events_file = LOGS_DIR / f"events_{mes}.jsonl"
+        self.feedback_file = LOGS_DIR / f"feedback_{mes}.jsonl"
+
     def timer(self, stage):
         class _Timer:
             def __init__(t_self, outer, name):
@@ -100,37 +125,121 @@ class SimpleMetrics:
                     t_self.outer.counters[f"{t_self.name}_calls"] += 1
                 logger.info(f"📊 [{t_self.name}] {elapsed:.1f}ms")
         return _Timer(self, stage)
-    
-    def record_query(self, success=True, error=None, metadata_hits=0, metadata_misses=0, stages=None):
+
+    def _acumular(self, c, calidad: dict):
+        c["metadata_hits"] += calidad.get("metadata_hits", 0)
+        c["metadata_misses"] += calidad.get("metadata_misses", 0)
+        if "cobertura_m3" in calidad:
+            c["m3_cobertura_sum"] += calidad["cobertura_m3"]
+            c["m3_cobertura_n"] += 1
+            if not calidad["cobertura_m3"]:
+                c["turnos_sin_clase_m3"] += 1
+        if calidad.get("perfil"):
+            c["turnos_con_perfil"] += 1
+        c["emergentes"] += calidad.get("emergentes", 0)
+        c["reconocidos"] += calidad.get("reconocidos", 0)
+        if "artistas_distintos" in calidad:
+            c["artistas_distintos_sum"] += calidad["artistas_distintos"]
+            c["artistas_distintos_n"] += 1
+        c["repetidas_filtras"] += calidad.get("repetidas", 0)
+
+    def record_query(self, success=True, error=None, metadata_hits=0,
+                     metadata_misses=0, stages=None, calidad=None, evento=None):
+        calidad = dict(calidad or {})
+        calidad.setdefault("metadata_hits", metadata_hits)
+        calidad.setdefault("metadata_misses", metadata_misses)
         with self._lock:
-            self.counters["total_queries"] += 1
+            c = self.counters
+            c["total_queries"] += 1
             if success:
-                self.counters["successful_queries"] += 1
+                c["successful_queries"] += 1
             else:
-                self.counters["failed_queries"] += 1
-            self.counters["metadata_hits"] += metadata_hits
-            self.counters["metadata_misses"] += metadata_misses
+                c["failed_queries"] += 1
+                self.errors.append({"timestamp": datetime.now().isoformat(), "error": error})
+            self._acumular(c, calidad)
+            proveedor = calidad.get("llm_proveedor") or "determinista"
+            if proveedor == "determinista":
+                c["respuestas_deterministas"] += 1
+            else:
+                c["respuestas_llm"] += 1
+                if calidad.get("llm_rechazado"):
+                    c["respuestas_llm_rechazadas"] += 1
+            for nombre, valor in (stages or {}).items():
+                self.timings[nombre].append(valor)
+                self.timings[nombre] = self.timings[nombre][-500:]
             total_ms = (stages or {}).get("total")
-            if total_ms:
-                self.timings["total"].append(total_ms)
-                self.timings["total"] = self.timings["total"][-500:]
             record = {
                 "timestamp": datetime.now().isoformat(),
                 "success": success, "error": error,
-                "metadata_hits": metadata_hits, "metadata_misses": metadata_misses,
-                "avg_latency_ms": round(total_ms, 1) if total_ms else 0
+                "calidad": calidad,
+                "latencies_ms": {k: round(v, 1) for k, v in (stages or {}).items()},
+                "avg_latency_ms": round(total_ms, 1) if total_ms else 0,
             }
             with open(self.metrics_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    
+            if evento is not None:
+                with open(self.events_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(evento, ensure_ascii=False) + "\n")
+
+    def record_feedback(self, dato: dict):
+        """Etiqueta de usuario sobre un turno: la única ground truth posible aquí."""
+        with self._lock:
+            self.counters["feedback_total"] += 1
+            self.counters[f"feedback_{dato.get('valor', 'otro')}"] += 1
+            with open(self.feedback_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now().isoformat(), **dato},
+                                   ensure_ascii=False) + "\n")
+
+    def record_bloqueo(self):
+        """Turnos rechazados por el límite por IP: telemetría de la demo pública."""
+        with self._lock:
+            self.counters["consultas_bloqueadas"] += 1
+
+    def _percentil(self, datos, q):
+        if not datos:
+            return 0
+        ordenado = sorted(datos)
+        i = min(len(ordenado) - 1, max(0, int(round(q * (len(ordenado) - 1)))))
+        return round(ordenado[i], 1)
+
     def get_summary(self):
         with self._lock:
-            total = self.counters["total_queries"]
+            c = self.counters
+            total = c["total_queries"]
+            hits, misses = c["metadata_hits"], c["metadata_misses"]
+            lat = self.timings.get("total", [])
             return {
+                # --- operación (telemetría, no es precisión de recomendación) ---
                 "total_queries": total,
-                "success_rate": (self.counters["successful_queries"] / total * 100) if total > 0 else 0,
-                "metadata_coverage": (self.counters["metadata_hits"] / (self.counters["metadata_hits"] + self.counters["metadata_misses"]) * 100) if (self.counters["metadata_hits"] + self.counters["metadata_misses"]) > 0 else 0,
-                "avg_latency_ms": np.mean(self.timings.get("total", [0])) if self.timings.get("total") else 0
+                "success_rate": (c["successful_queries"] / total * 100) if total else 0,
+                "avg_latency_ms": round(float(np.mean(lat)), 1) if lat else 0,
+                "latency_p50_ms": self._percentil(lat, 0.50),
+                "latency_p90_ms": self._percentil(lat, 0.90),
+                "latency_p99_ms": self._percentil(lat, 0.99),
+                # --- calidad del pipeline ---
+                "metadata_coverage": (hits / (hits + misses) * 100) if (hits + misses) else 0,
+                "m3_coverage": (c["m3_cobertura_sum"] / c["m3_cobertura_n"] * 100) if c["m3_cobertura_n"] else 0,
+                "turnos_sin_clase_m3": c["turnos_sin_clase_m3"],
+                "turnos_con_perfil": c["turnos_con_perfil"],
+                "artistas_distintos_promedio": (
+                    c["artistas_distintos_sum"] / c["artistas_distintos_n"]
+                    if c["artistas_distintos_n"] else 0),
+                "emergentes_recomendados": c["emergentes"],
+                "reconocidos_recomendados": c["reconocidos"],
+                "repetidas_filtras": c["repetidas_filtras"],
+                "respuestas_llm": c["respuestas_llm"],
+                "respuestas_llm_rechazadas": c["respuestas_llm_rechazadas"],
+                "respuestas_deterministas": c["respuestas_deterministas"],
+                "feedback_total": c["feedback_total"],
+                "feedback_gust": c["feedback_gust"],
+                "feedback_no_gust": c["feedback_no_gust"],
+                "consultas_bloqueadas": c["consultas_bloqueadas"],
+                "errores": list(self.errors[-10:]),
+                "avisos_evaluacion": (
+                    "Hit Rate / MRR / NDCG requieren etiquetas de relevancia: "
+                    "se calculan sobre logs/events_*.jsonl + logs/feedback_*.jsonl, "
+                    "nunca a partir de estos contadores."
+                ),
             }
 
 metrics = SimpleMetrics()
@@ -141,24 +250,64 @@ metrics = SimpleMetrics()
 CONVERSACIONES = {}  # {session_id: {"messages": [...], "recomendados": set(), "ts": float}}
 MAX_MENSAJES_HISTORIAL = 10
 SESION_TTL_SEGUNDOS = 2 * 60 * 60  # 2 horas sin actividad → la sesión expira
+MAX_SESIONES = int(os.getenv("MAX_SESIONES", "500"))  # techo de memoria en la VM
 
 def obtener_sesion(session_id: str) -> dict:
     ahora = time.time()
     for sid in [s for s, d in CONVERSACIONES.items() if ahora - d["ts"] > SESION_TTL_SEGUNDOS]:
         del CONVERSACIONES[sid]
+    # Demo pública: si alguien abre cientos de sesiones, se liberan las más
+    # antiguas antes de crear una nueva (solo pierden el historial de chat).
+    while len(CONVERSACIONES) >= MAX_SESIONES:
+        mas_vieja = min(CONVERSACIONES.items(), key=lambda kv: kv[1]["ts"])[0]
+        del CONVERSACIONES[mas_vieja]
     return CONVERSACIONES.setdefault(session_id, {
         "messages": [],           # turnos reales de chat (role/content)
         "recomendados": set(),    # IDs ya ofrecidos: el retrieval no los repite
         "ts": ahora,
         "turnos": 0,              # contador para variar las respuestas
         "ultima_query_en": "",    # vibra actual, para "otras parecidas"
+        "perfil_pedido": {},      # género/ánimo del último turno, para heredarlos
         "ultimos_nombres": [],    # últimas canciones, para retomarlas al hablar
+        "ultimo_turno": None,     # id del último evento: lo que etiqueta /api/feedback
+        "etiquetables": {},       # evento_id → turno/consulta reales del feedback
     })
 
 # =====================================================================
 # 🎯 UTILIDADES: Cache de Metadatos + Enlaces Reales
 # =====================================================================
 POP_RECONOCIDO = int(os.getenv("POP_RECONOCIDO", "60"))  # umbral de popularidad Spotify
+# Fuerza del castigo por ánimo (0 = desactivado, 1 = canción opuesta pierde todo).
+ANIMO_FILTRO = float(os.getenv("ANIMO_FILTRO", "0.60"))
+# Idem para el género pedido: las etiquetas del catálogo son ruidosas, así que se
+# castiga menos que el ánimo para no quedarse sin pool cuando el género escasea.
+GENERO_FILTRO = float(os.getenv("GENERO_FILTRO", "0.50"))
+
+def _vacio(x) -> bool:
+    """Sin valor útil: None, vacío, 'Unknown' o el 'nan' que sale de un NaN en parquet."""
+    return not x or str(x).strip().lower() in ("unknown", "none", "nan", "null", "?", "-")
+
+def _nombre_real(candidato: dict) -> bool:
+    """True si la candidata tiene un título que se pueda mostrar al usuario.
+
+    Las filas de la tabla maestra sin `track_title` daban tarjetas que la UI
+    tenía que rotular como "Canción recomendada" (en la demo se veía como un
+    fallo del recomendador cuando era un hueco del catálogo).
+    """
+    return not _vacio(candidato.get("track_name"))
+
+
+def _genero_principal(candidato: dict) -> str:
+    """Género mostrable de una candidata: la etiqueta canónica, no el texto crudo.
+
+    `generos` (conjunto canónico de las tres columnas del catálogo) ya viene
+    ordenado con el género pedido primero, así que "rock · blues" gana a un
+    `genre_lyr` suelto que diga solo "blues" para una canción de rock.
+    """
+    for etiqueta in candidato.get("generos") or []:
+        if not _vacio(etiqueta):
+            return str(etiqueta).strip()
+    return "" if _vacio(candidato.get("genre")) else str(candidato["genre"]).strip()
 
 def _norm_join_key(s) -> str:
     """Clave normalizada (artista, título) para unir tablas por nombre."""
@@ -190,10 +339,9 @@ def generar_enlaces_reales(song_id: str, track="", artist="", genre="") -> dict:
     Antes se generaban con el cache parcial de metadatos: para ~10 mil
     canciones el artista era "Unknown" y la búsqueda de YouTube degeneraba
     en "rock music official" — la canción mostrada nunca aparecía."""
-    def _vacia(x): return not x or str(x).strip().lower() in ("unknown", "?", "nan", "none")
-    track = "" if _vacia(track) else str(track).strip()
-    artist = "" if _vacia(artist) else str(artist).strip()
-    genre = "" if _vacia(genre) else str(genre).strip()
+    track = "" if _vacio(track) else str(track).strip()
+    artist = "" if _vacio(artist) else str(artist).strip()
+    genre = "" if _vacio(genre) else str(genre).strip()
 
     is_spotify_id = bool(song_id and len(song_id) == 22 and song_id.isalnum() and not song_id.startswith("TR"))
 
@@ -226,15 +374,16 @@ def enriquecer_candidato(candidato: dict) -> dict:
     #    vacíos/Unknown y nunca pisa un nombre real con "Unknown"
     merged = {**metadata, **candidato}
     for key in ("track_name", "artist_name", "genre"):
-        if merged.get(key) in [None, "", "Unknown"] and metadata.get(key) not in [None, "", "Unknown"]:
+        if _vacio(merged.get(key)) and not _vacio(metadata.get(key)):
             merged[key] = metadata[key]
+    merged["sin_nombre"] = not _nombre_real(merged)
     # 2) Enlaces DESPUÉS del merge: YouTube busca por los nombres reales de la
     #    recomendación, también para artistas emergentes sin biografía en cache
     enlaces = generar_enlaces_reales(
         song_id,
         track=merged.get("track_name"),
         artist=merged.get("artist_name"),
-        genre=merged.get("genre"),
+        genre=_genero_principal(merged),
     )
     return {**merged, **enlaces}
 
@@ -246,6 +395,9 @@ def enriquecer_candidato(candidato: dict) -> dict:
 # orden los backends configurados (endpoint propio → Ollama local con Qwen →
 # router HF) y se salta los que están caídos, sin reintentar errores fatales.
 llm = ClienteLLM(log=print)
+# Ping de arranque en segundo plano: deja Qwen local caliente y descubre ya
+# (no en el primer mensaje) que el router de HF responde 402 sin créditos.
+llm.diagnosticar()
 
 # Palabras que ya vienen en inglés y sirven tal cual como keywords de retrieval
 KEYWORDS_EN_DIRECTAS = {
@@ -328,6 +480,9 @@ class Module2MasterTable:
         self.pop_by_artista = {}  # Popularidad MÁXIMA del artista (índice de fama)
         self.pop_artista_by_id = []  # Popularidad del artista por fila
         self.is_classic = []      # Flag isClassic de WASABI por fila
+        self.genero_terms = []    # Términos de género por fila (perfil de búsqueda)
+        self.feat_nombre = []     # Rasgos de ánimo que trae el catálogo
+        self.feat_cuanto = None   # Cuantiles [0,1] de esos rasgos, por fila
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.t_col = self.a_col = self.l_col = None
         self._load()
@@ -417,10 +572,36 @@ class Module2MasterTable:
                 self.is_classic = [str(v).strip().lower() == "true" for v in self.df_ref["isClassic"]]
             else:
                 self.is_classic = [False] * len(self.df_ref)
+
+            # 🎚️ Perfil de género + ánimo por fila (ver perfiles.py). El retrieval
+            # solo usaba embeddings líricos y Jaccard de letras: ninguna de las dos
+            # compara el MOOD pedido con el mood de la canción, así que "algo
+            # tranquilo" podía salir en hard rock. Los rasgos se guardan como
+            # cuantiles porque están muy sesgados (sadness: mediana 0.03, p75 0.28).
+            def _texto(nombre):
+                serie = self.df_ref.get(nombre)
+                return serie.fillna("").astype(str) if serie is not None else ""
+            mezcla = (_texto("genre_lyr") + " | " + _texto("genre_was") + " | " + _texto("album_genre"))
+            self.genero_terms = [perfiles.canonicos(g) for g in mezcla]
+            bloques, nombres = [], []
+            for rasgo in perfiles.FEATURES:
+                serie = self.df_ref.get(rasgo)
+                if serie is None:
+                    continue
+                valores = pd.to_numeric(serie, errors="coerce")
+                if valores.notna().sum() < 2:
+                    continue
+                nombres.append(rasgo)
+                bloques.append(valores.fillna(valores.median()).to_numpy(dtype="float64"))
+            self.feat_nombre = nombres
+            self.feat_cuanto = (
+                perfiles.cuantiles(np.column_stack(bloques)) if nombres and bloques else None
+            )
             print(f"✅ Módulo 2 listo | Canciones: {len(self.df_ref)} | Vocab: {len(self.vocab)} | "
                   f"con popularidad: {sum(1 for p in self.pop_by_id if p is not None)} | "
                   f"con fama de artista: {sum(1 for p in self.pop_artista_by_id if p is not None)} | "
-                  f"clásicos: {sum(self.is_classic)}")
+                  f"clásicos: {sum(self.is_classic)} | perfil: {len(nombres)} rasgos "
+                  f"({', '.join(nombres) or 'ninguno'})")
         else:
             print("⚠️ Módulo 2: Sin datos de referencia. Usando fallback.")
     
@@ -455,12 +636,18 @@ class Module2MasterTable:
                 print(f"⚠️ Módulo 2: scaler fallback a ceros: {e}")
         return torch.zeros(1, 26, device=self.device)
 
-    def retrieve_top10(self, user_query_en, k=10, exclude=None):
-        """🔍 RETRIEVAL PRINCIPAL: Busca en Tabla Maestra por similitud lírica+técnica.
+    def retrieve_top10(self, user_query_en, k=10, exclude=None, diag=None, heredar=None):
+        """🔍 RETRIEVAL PRINCIPAL: Tabla Maestra por similitud lírica + léxica + perfil.
 
         exclude: IDs ya recomendados en la sesión. Se apartan ANTES del top-k,
         de modo que siempre se devuelven k canciones nuevas cuando quedan
         disponibles.
+        diag: dict opcional que el llamador pasa para recibir qué señales se
+        aplicaron (cobertura del perfil, componentes activos). Es para las
+        métricas de la tesis: sin eso no se puede explicar un mal ranking.
+        heredar: (géneros, ánimo) del turno anterior, solo en turnos de
+        continuación. Sin ello "dame más de esa energía" se queda sin género y
+        el cupo de emergentes devuelve jazz después de una tanda de rock.
         """
         if self.df_ref is None or len(self.df_ref) == 0:
             # Fallback: retornar IDs dummy si no hay datos
@@ -481,10 +668,12 @@ class Module2MasterTable:
                 jaccard_scores.append(len(query_set & ws) / len(union) if union else 0.0)
             jaccard_scores = torch.tensor(jaccard_scores, device=self.device)
             
-            # Score ponderado: 40% neural + 60% léxico.
-            # Ambos componentes se normalizan en el pool antes de pesarlos:
-            # con consultas cortas por keywords, Jaccard crudo es órdenes de
+            # Score ponderado: neuronal + léxico + perfil (género/ánimo).
+            # Cada componente se normaliza en el pool antes de pesarlo: con
+            # consultas cortas por keywords, Jaccard crudo es órdenes de
             # magnitud más pequeño que la similitud neural y no contribuiría.
+            # Los pesos se renormalizan sobre los componentes que SÍ tienen
+            # señal: una consulta sin mood no castiga a nadie por un perfil vacío.
             neural_sim = torch.nan_to_num(neural_sim, nan=0.0)
             jaccard_scores = torch.nan_to_num(jaccard_scores, nan=0.0)
 
@@ -494,7 +683,63 @@ class Module2MasterTable:
                     return torch.zeros_like(t)
                 return (t - t_min) / (t_max - t_min)
 
-            score = 0.40 * _norm_01(neural_sim) + 0.60 * _norm_01(jaccard_scores)
+            generos_pedido, animo_pedido = perfiles.perfil_consulta(user_query_en)
+            generos_pedido, animo_pedido, perfil_heredado = perfiles.heredar_perfil(
+                generos_pedido, animo_pedido, heredar
+            )
+            perfil_np = perfiles.perfil_vector(
+                generos_pedido, animo_pedido, self.genero_terms,
+                self.feat_nombre, self.feat_cuanto,
+            )
+            componentes = [("neural", 0.40, _norm_01(neural_sim)),
+                           ("lexico", 0.60, _norm_01(jaccard_scores))]
+            if perfil_np is not None:
+                perfil = torch.nan_to_num(
+                    torch.as_tensor(perfil_np, dtype=torch.float, device=self.device), nan=0.0
+                )
+                componentes = [("neural", 0.30, _norm_01(neural_sim)),
+                               ("lexico", 0.35, _norm_01(jaccard_scores)),
+                               ("perfil", 0.35, perfil)]
+            # Un componente sin discriminación (normalizado todo a 0) no debe
+            # arrastrar el score: se sale y su peso se reparte entre los activos.
+            activos = [c for c in componentes if c[2].abs().sum().item() > 0] or componentes[:1]
+            total_pesos = sum(peso for _, peso, _ in activos) or 1.0
+            score = sum((peso / total_pesos) * v for _, peso, v in activos)
+
+            # Guardabarros de ánimo y género: lo que el usuario pidió explícitamente
+            # se impone como castigo multiplicativo, no como una señal más que el
+            # blend puede votarse. Con peso 0.35, "tranquilo" devolvía rock y "rock
+            # con garra" devolvía blues porque la similitud neural y la letra pesan
+            # más que la etiqueta.
+            # Los desvíos por fila también se guardan en la candidata: dan una
+            # métrica de alineación SIN etiquetas (¿el top-10 cumple lo pedido?).
+            filtros: dict[str, torch.Tensor] = {}
+            promedios: dict[str, float] = {}
+            senales = [
+                ("animo_filtro",
+                 perfiles.distancia_animo(animo_pedido, self.feat_nombre, self.feat_cuanto),
+                 ANIMO_FILTRO),
+                ("genero_filtro",
+                 perfiles.desvio_genero(generos_pedido, self.genero_terms),
+                 GENERO_FILTRO),
+            ]
+            for nombre, desvio, fuerza in senales:
+                if desvio is None:
+                    continue
+                d = torch.as_tensor(desvio, dtype=torch.float, device=self.device)
+                filtros[nombre] = d
+                if fuerza > 0:
+                    score = score * (1.0 - fuerza * d).clamp(min=0.0)
+                promedios[nombre] = round(float(d.mean().item()), 3)
+            if diag is not None:
+                diag["perfil"] = perfiles.describir_perfil(generos_pedido, animo_pedido)
+                diag["componentes"] = [n for n, _, _ in activos] + list(filtros)
+                diag["filtros"] = promedios
+                # Legible por máquina: el llamador lo guarda en la sesión para
+                # heredarlo cuando el usuario solo pide "más de lo mismo".
+                diag["generos_pedido"] = sorted(generos_pedido)
+                diag["animo_pedido"] = dict(animo_pedido)
+                diag["perfil_heredado"] = perfil_heredado
 
             # Apartar canciones ya recomendadas en la sesión antes del top-k
             if excl and self.song_ids:
@@ -519,14 +764,34 @@ class Module2MasterTable:
             pop = self.pop_by_id[idx] if idx < len(self.pop_by_id) else None
             pop_art = self.pop_artista_by_id[idx] if idx < len(self.pop_artista_by_id) else None
             is_c = self.is_classic[idx] if idx < len(self.is_classic) else False
+            # Etiquetas canónicas de la fila, con la pedida primero: la ficha puede
+            # decir "rock · blues" en vez del único `genre_lyr`, que a veces dice
+            # "blues" de una canción que sí es rock según las otras dos columnas.
+            generos_fila = sorted(
+                self.genero_terms[idx] if idx < len(self.genero_terms) else set(),
+                key=lambda nombre: (nombre not in generos_pedido, nombre),
+            )
             reconocido = (pop is not None and pop >= POP_RECONOCIDO) \
                 or (pop_art is not None and pop_art >= POP_RECONOCIDO) \
                 or is_c
+            # Alineación con lo pedido, por candidata. Sirve para evaluar sin
+            # etiquetas: si el usuario nombró un ánimo, ¿cuánto se desvía esta
+            # canción? Si nombró un género, ¿está en sus etiquetas canónicas?
+            cumple_genero = None if not generos_pedido else bool(
+                set(generos_fila) & generos_pedido
+            )
+            desvio_animo = None if "animo_filtro" not in filtros else round(
+                float(filtros["animo_filtro"][idx]), 3
+            )
             results.append({
+                "cumple_genero": cumple_genero,
+                "desvio_animo": desvio_animo,
                 "id": self.song_ids[idx] if idx < len(self.song_ids) else str(row.get("id", row.get("msd_id", f"unknown_{idx}"))),
-                "track_name": str(row.get(self.t_col, "Unknown")),
-                "artist_name": str(row.get(self.a_col, "Unknown")),
-                "genre": str(row.get("genre_lyr", row.get("genre", "Unknown"))),
+                "track_name": "" if _vacio(row.get(self.t_col)) else str(row.get(self.t_col)).strip(),
+                "artist_name": "" if _vacio(row.get(self.a_col)) else str(row.get(self.a_col)).strip(),
+                "genre": "" if _vacio(row.get("genre_lyr", row.get("genre"))) else str(row.get("genre_lyr", row.get("genre"))).strip(),
+                "generos": generos_fila,
+                "sin_nombre": False,
                 "similarity": round(safe_sim, 4),
                 "popularity": pop,
                 "popularity_artista": pop_art,
@@ -578,38 +843,26 @@ class Module3IntentReranker:
         tokens += [0] * (max_len - len(tokens))
         return torch.tensor([tokens], device=self.device)
     
-    def rerank_candidates(self, candidates: list, user_query_en: str) -> list:
-        """🎯 RE-RANKING: re-ordena combinando similitud del Módulo 2 con intención del Módulo 3.
+    def rerank_candidates(self, candidates: list, user_query_en: str) -> tuple[list, dict]:
+        """🎯 RE-RANKING: combina la similitud del Módulo 2 con la intención del 3.
 
-        La intención se normaliza respecto al máximo entre los candidatos conocidos:
-        el re-ranking solo mueve canciones cuando el Módulo 3 tiene convicción real,
-        y las desconocidas conservan el orden de similitud del Módulo 2.
+        La intención se normaliza respecto al máximo entre los candidatos que el
+        Módulo 3 conoce (sus clases son ~38 mil canciones del set de Talkplay, no
+        el subconjunto de la tabla maestra). La aritmética vive en rerank.py para
+        poder probarla sin checkpoints; aquí solo se calculan las probabilidades.
         """
-        if not candidates: return candidates
+        if not candidates: return candidates, {"cobertura_m3": 0.0, "intent_neutra": 0.0,
+                                               "candidatas_sin_clase_m3": 0, "m3_aporto_orden": False}
         tokens = self.tokenize(user_query_en)
         with torch.no_grad():
             logits = self.model(tokens)
             probs = F.softmax(logits, dim=1)[0]
 
-        known_probs = [probs[self.song2idx[c["id"]]].item() for c in candidates if c.get("id") in self.song2idx]
-        max_prob = max(known_probs) if known_probs else 0.0
-
-        scored = []
-        for c in candidates:
-            if c.get("id") in self.song2idx:
-                p = probs[self.song2idx[c["id"]]].item()
-                intent_score = (p / max_prob) if max_prob > 0 else 0.0
-            else:
-                intent_score = 0.0
-            scored.append({**c, "intent_score": round(intent_score, 4)})
-
-        # Re-ordenar: 70% score original (Módulo 2) + 30% intención (Módulo 3)
-        for s in scored:
-            s["final_score"] = 0.70 * s.get("similarity", 0) + 0.30 * s.get("intent_score", 0)
-
-        scored.sort(key=lambda x: x["final_score"], reverse=True)
-        for i, item in enumerate(scored): item["rank"] = i + 1
-        return scored[:10]
+        probabilidades = {
+            c["id"]: probs[self.song2idx[c["id"]]].item()
+            for c in candidates if c.get("id") in self.song2idx
+        }
+        return rerank.fusionar(candidates, probabilidades)
 
 # =====================================================================
 # 🎨 SELECCIÓN DEL TOP N: prioriza emergentes + garantiza reconocidos
@@ -633,6 +886,13 @@ def seleccionar_candidatos(pool, objetivo=None, max_por_artista=None, minimo_rec
     if minimo_reconocidos is None: minimo_reconocidos = int(os.getenv("MINIMO_RECONOCIDOS", "3"))
     minimo_reconocidos = max(1, min(minimo_reconocidos, objetivo - 1))
     cuota_eme = objetivo - minimo_reconocidos
+
+    # Sin título no hay tarjeta útil (la UI la rotulaba "Canción recomendada" y
+    # el enlace de YouTube caía a una búsqueda genérica): se prefiere lo que
+    # sí tiene nombre, salvo que no quede más remedio que mostrar el hueco.
+    con_nombre = [c for c in pool if _nombre_real(c)]
+    if len(con_nombre) >= objetivo:
+        pool = con_nombre
 
     for cap in (max_por_artista, 5, None):
         elegidos, conteo = [], defaultdict(int)
@@ -676,7 +936,9 @@ def seleccionar_candidatos(pool, objetivo=None, max_por_artista=None, minimo_rec
 # 🚀 INICIALIZACIÓN DE MÓDULOS (ORDEN CORREGIDO)
 # =====================================================================
 cargar_metadata_cache(MODELS_DIR)
-module2 = Module2MasterTable(MODELS_DIR)  # 🔍 Retrieval Principal
+# En local la tabla maestra vive dos niveles arriba; en Docker/Spaces se
+# sobreescribe con TABLA_MAESTRA_DIR para no depender del layout del repo.
+module2 = Module2MasterTable(MODELS_DIR, data_dir=os.getenv("TABLA_MAESTRA_DIR"))  # 🔍 Retrieval Principal
 module3 = Module3IntentReranker(MODELS_DIR)  # 🎯 Re-ranking Semántico
 
 # =====================================================================
@@ -758,30 +1020,58 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
         # FASE 2: 🔍 Módulo 2 - RETRIEVAL PRINCIPAL (Tabla Maestra)
         print("⚖️ Fase 2: Módulo 2 - Retrieval desde Tabla Maestra...")
         t2 = time.time()
+        diagnostico_m2 = {}
+        # "dame más", "otras parecidas" → seguir con el género/ánimo del turno
+        # anterior; sin eso la tanda nueva se rige solo por el cupo de emergentes.
+        heredar = None
+        if tipo_turno == "mas_de_lo_mismo":
+            previo = sesion.get("perfil_pedido") or {}
+            if previo.get("generos") or previo.get("animo"):
+                heredar = (previo.get("generos"), previo.get("animo"))
         # No repetir canciones ya recomendadas en esta sesión (exclusión dentro
         # del retrieval garantiza 10 frescas cuando hay disponibles)
-        pool_m2 = module2.retrieve_top10(query_en, k=30, exclude=sesion["recomendados"])
+        pool_m2 = module2.retrieve_top10(query_en, k=30, exclude=sesion["recomendados"],
+                                         diag=diagnostico_m2, heredar=heredar)
         stage_latencies["retrieval"] = (time.time() - t2) * 1000
+        sesion["perfil_pedido"] = {
+            "generos": diagnostico_m2.get("generos_pedido") or [],
+            "animo": diagnostico_m2.get("animo_pedido") or {},
+        }
+        if diagnostico_m2.get("perfil"):
+            heredado = " · heredado" if diagnostico_m2.get("perfil_heredado") else ""
+            print(f"   🎚️ Perfil aplicado: {diagnostico_m2['perfil']}{heredado} "
+                  f"| señales: {','.join(diagnostico_m2.get('componentes', []))}")
 
-        frescos = [c for c in pool_m2 if c.get("id") not in sesion["recomendados"]]
-        candidatos = seleccionar_candidatos(frescos or pool_m2, objetivo=10)
-        repetidas = len(pool_m2) - len(frescos)
+        # Enriquecer ANTES de seleccionar: hay filas de la tabla maestra sin
+        # track_title que el cache de metadatos sí puede nombrar. Si se
+        # seleccionara primero, esas canciones se colarían como tarjetas sin
+        # título ("Canción recomendada") o quedarían fuera sin necesidad.
+        pool_enriquecido = [enriquecer_candidato(c) for c in pool_m2]
+
+        frescos = [c for c in pool_enriquecido if c.get("id") not in sesion["recomendados"]]
+        candidatos = seleccionar_candidatos(frescos or pool_enriquecido, objetivo=10)
+        repetidas = len(pool_enriquecido) - len(frescos)
         n_eme = sum(1 for c in candidatos if c.get("emergente"))
         n_rec = len(candidatos) - n_eme
-        print(f"   📦 Pool: {len(pool_m2)} | nuevas: {len(frescos)} | seleccionadas: {len(candidatos)} "
+        sin_nombre = sum(1 for c in candidatos if c.get("sin_nombre"))
+        print(f"   📦 Pool: {len(pool_enriquecido)} | nuevas: {len(frescos)} | seleccionadas: {len(candidatos)} "
               f"(emergentes: {n_eme} · reconocidas: {n_rec}) | ya recomendadas (filtradas): {repetidas}")
+        if sin_nombre:
+            print(f"   ⚠️ {sin_nombre} seleccionada(s) sin título real en el catálogo")
 
         # FASE 3: 🎯 Módulo 3 - RE-RANKING SEMÁNTICO (Intención)
         print("🧠 Fase 3: Módulo 3 - Re-ranking por intención conversacional...")
         t3 = time.time()
-        candidates_m3 = module3.rerank_candidates(candidatos, query_en)
+        candidates_m3, diag_m3 = module3.rerank_candidates(candidatos, query_en)
         stage_latencies["reranking"] = (time.time() - t3) * 1000
+        print(f"   🎯 Cobertura M3: {diag_m3['cobertura_m3'] * 100:.0f}% del pool "
+              f"({diag_m3['candidatas_sin_clase_m3']} sin clase en el re-ranker, "
+              f"intención neutra {diag_m3['intent_neutra']})")
 
-        # Enriquecer con metadatos y enlaces
-        candidates_final = [enriquecer_candidato(c) for c in candidates_m3]
+        candidates_final = candidates_m3
         sesion["recomendados"].update(c.get("id") for c in candidates_final if c.get("id"))
         for c in candidates_final:
-            if c.get("track_name") not in [None, "", "Unknown"]: metadata_hits += 1
+            if not _vacio(c.get("track_name")): metadata_hits += 1
             else: metadata_misses += 1
         print(f"   🔗 Enlaces generados | Meta: {metadata_hits}/{len(candidates_final)}")
 
@@ -792,7 +1082,7 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
         for c in candidates_final[:6]:
             nombre = (c.get("track_name") or "").strip() or "Canción sin título"
             artista = (c.get("artist_name") or "").strip() or "artista desconocido"
-            genero = (c.get("genre") or "").strip()
+            genero = _genero_principal(c)
             sufijo = f" [{genero}]" if genero and genero.lower() != "unknown" else ""
             lineas_contexto.append(f"- «{nombre}» — {artista}{sufijo}")
         contexto = "\n".join(lineas_contexto)
@@ -818,45 +1108,127 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
             temperature=float(os.getenv("LLM_TEMPERATURA_CHAT", "0.7")),
             proposito="respuesta",
         )
+        turno = int(sesion.get("turnos", 0))
+        llm_rechazado = False
         if salida_chat:
-            # Un modelo pequeño puede divagar o inventar títulos: se descartan
-            # las frases con citas que no existen en la lista, se recorta a 5
-            # frases y, si no citó ninguna canción real, se añade la lista.
-            texto_llm = conversacion.descartar_citas_inventadas(
-                salida_chat.texto, candidates_final
-            )
-            respuesta_final = conversacion.garantizar_canciones(
-                texto_llm or salida_chat.texto, candidates_final, maximo_frases=5
-            )
-            respuesta_final = conversacion.cerrar_con_pregunta(
-                respuesta_final, int(sesion.get("turnos", 0))
+            # Un modelo pequeño puede divagar, enumerar sin contenido o inventar
+            # artistas. `validar_respuesta` es la ÚNICA puerta de salida del texto
+            # del modelo: si tras la limpieza no queda nada aprovechable se usa el
+            # motor determinista. Antes se hacía `texto_llm or salida_chat.texto`,
+            # que volvía a inyectar el texto crudo exactamente cuando la limpieza
+            # había descartado todo.
+            respuesta_final = conversacion.validar_respuesta(
+                salida_chat.texto, candidates_final, turno=turno, maximo_frases=5
             )
             modo_respuesta = salida_chat.proveedor
-            print(f"   🗣️ Respuesta vía {salida_chat.proveedor} ({salida_chat.latencia_ms:.0f} ms, {salida_chat.modelo})")
+            if respuesta_final is None:
+                llm_rechazado = True
+                respuesta_final = respuesta_sin_llm(candidates_final, mensaje_usuario, sesion)
+                modo_respuesta = "determinista"
+                print(f"   ⚠️ Salida del LLM sin contenido aprovechable "
+                      f"({salida_chat.texto[:60]!r}) → respaldo determinista")
+            else:
+                print(f"   🗣️ Respuesta vía {salida_chat.proveedor} "
+                      f"({salida_chat.latencia_ms:.0f} ms, {salida_chat.modelo})")
         else:
             respuesta_final = respuesta_sin_llm(candidates_final, mensaje_usuario, sesion)
             modo_respuesta = "determinista"
             print("   ⚠️ Sin LLM disponible → respuesta conversacional determinista")
         stage_latencies["generation"] = (time.time() - t4) * 1000
 
-        # Guardar turno en la memoria de la sesión
+        # Guardar turno en la memoria de la sesión. Del historial se fuera el
+        # refuerzo de plantilla: si queda, el modelo lo copia en los turnos siguientes.
         sesion["messages"].append({"role": "user", "content": mensaje_usuario})
-        sesion["messages"].append({"role": "assistant", "content": respuesta_final})
+        sesion["messages"].append({
+            "role": "assistant",
+            "content": conversacion.sin_refuerzos_de_plantilla(respuesta_final),
+        })
         sesion["messages"] = sesion["messages"][-2 * MAX_MENSAJES_HISTORIAL:]
-        sesion["turnos"] = int(sesion.get("turnos", 0)) + 1
+        sesion["turnos"] = turno + 1
         nombres = [
             c.get("track_name") for c in candidates_final[:3]
-            if c.get("track_name") not in (None, "", "Unknown")
+            if not _vacio(c.get("track_name"))
         ]
         sesion["ultimos_nombres"] = nombres
         sesion["ts"] = time.time()
 
         stage_latencies["total"] = (time.time() - query_start) * 1000
-        metrics.record_query(success=True, metadata_hits=metadata_hits, metadata_misses=metadata_misses, stages=stage_latencies)
+
+        # 📋 Evaluación de la tesis: un evento por turno, con el ranking completo.
+        # Es el insumo de HR/Recall/Precision/MRR/NDCG: esas métricas necesitan
+        # etiquetas de relevancia y se calculan offline sobre este JSONL, nunca
+        # desde los contadores de operación.
+        evento_id = f"{session_id[:8]}-{turno + 1}-{int(query_start * 1000)}"
+        sesion["ultimo_turno"] = evento_id
+        artistas = {c.get("artist_name") for c in candidates_final if not _vacio(c.get("artist_name"))}
+        calidad = {
+            "metadata_hits": metadata_hits,
+            "metadata_misses": metadata_misses,
+            "cobertura_m3": diag_m3["cobertura_m3"],
+            "m3_aporto_orden": diag_m3["m3_aporto_orden"],
+            "perfil": diagnostico_m2.get("perfil", ""),
+            "perfil_heredado": bool(diagnostico_m2.get("perfil_heredado")),
+            "componentes_m2": diagnostico_m2.get("componentes", []),
+            "emergentes": n_eme,
+            "reconocidos": n_rec,
+            "artistas_distintos": len(artistas),
+            "sin_nombre": sin_nombre,
+            "repetidas": repetidas,
+            "pool_nuevas": len(frescos),
+            "tipo_turno": tipo_turno,
+            "intencion": fuente_intencion,
+            "llm_proveedor": modo_respuesta,
+            "llm_rechazado": llm_rechazado,
+        }
+        sesion["ultima_calidad"] = calidad
+        # /api/feedback puede etiquetar un turno anterior: se guarda el contexto
+        # exacto de este evento para no anotar el turno ni la consulta de despues.
+        etiquetables = sesion.setdefault("etiquetables", {})
+        etiquetables[evento_id] = {
+            "turno": turno + 1,
+            "query_en": query_en,
+            "cobertura_m3": diag_m3["cobertura_m3"],
+        }
+        while len(etiquetables) > 10:
+            etiquetables.pop(next(iter(etiquetables)))
+        metrics.record_query(
+            success=True, stages=stage_latencies, calidad=calidad,
+            evento={
+                "id": evento_id,
+                "timestamp": datetime.now().isoformat(),
+                "session_id": session_id,
+                "turno": turno + 1,
+                "mensaje": mensaje_usuario[:300],
+                "query_en": query_en,
+                "tipo_turno": tipo_turno,
+                "respuesta": respuesta_final,
+                "latencies_ms": {k: round(v, 1) for k, v in stage_latencies.items()},
+                "calidad": calidad,
+                "ranking": [
+                    {
+                        "rank": c.get("rank"), "id": c.get("id"),
+                        "track_name": c.get("track_name"),
+                        "artist_name": c.get("artist_name"), "genre": c.get("genre"),
+                        "generos": c.get("generos"),
+                        "cumple_genero": c.get("cumple_genero"),
+                        "desvio_animo": c.get("desvio_animo"),
+                        "similarity": c.get("similarity"),
+                        "intent_score": c.get("intent_score"),
+                        "intent_conocida": c.get("intent_conocida"),
+                        "final_score": c.get("final_score"),
+                        "emergente": c.get("emergente"),
+                        "reconocido": c.get("reconocido"),
+                        "popularity": c.get("popularity"),
+                    }
+                    for c in candidates_final
+                ],
+            },
+        )
 
         print(f"\n📦 DEBUG - Módulo 2 Top 1 (Retrieval): {pool_m2[0].get('track_name', 'Unknown')}")
         print(f"📦 DEBUG - Módulo 3 Top 1 (Re-ranked): {candidates_final[0].get('track_name', 'Unknown')}")
-        print(f"📊 Métricas: {stage_latencies['total']:.0f}ms total | {metadata_hits}/{len(candidates_final)} con metadata | voz: {modo_respuesta}")
+        print(f"📊 Métricas: {stage_latencies['total']:.0f}ms total | {metadata_hits}/{len(candidates_final)} con metadata | "
+              f"cobertura M3 {diag_m3['cobertura_m3'] * 100:.0f}% | voz: {modo_respuesta}")
 
         return {
             "response": respuesta_final, "query_en": query_en, "session_id": session_id,
@@ -868,6 +1240,18 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
                 "proveedor": modo_respuesta,
                 "intencion": fuente_intencion,
                 "etiqueta": llm.descripcion(),
+                "rechazada": llm_rechazado,
+            },
+            "evaluacion": {
+                "id": evento_id,
+                "cobertura_m3": diag_m3["cobertura_m3"],
+                "perfil": diagnostico_m2.get("perfil", ""),
+                "perfil_heredado": bool(diagnostico_m2.get("perfil_heredado")),
+                "tipo_turno": tipo_turno,
+                "metadata_coverage": metadata_hits / len(candidates_final) if candidates_final else 0,
+                "emergentes": n_eme,
+                "reconocidos": n_rec,
+                "artistas_distintos": len(artistas),
             },
             "turno": sesion["turnos"],
         }
@@ -881,17 +1265,37 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
 # =====================================================================
 app = Flask(__name__)
 
+# Demo pública: un turno llena los 2 núcleos de la VM durante segundos, así que se
+# frena por IP antes de ponerse a calcular. Se usa request.remote_addr y NO
+# X-Forwarded-For: sin proxy inverso delante, ese header lo escribe el cliente.
+LIMITE_POR_MINUTO = int(os.getenv("LIMITE_POR_MINUTO", "12"))
+limitador_chat = limite.LimitadorVentana(LIMITE_POR_MINUTO)
+# Los 👍/👎 no gastan el cupo de chat (una tanda admite varios avisos), pero tampoco
+# pueden escribir en el log de etiquetas a cualquier ritmo.
+limitador_feedback = limite.LimitadorVentana(int(os.getenv("LIMITE_FEEDBACK", "40")))
+# Un cuerpo de 16 KB ya es un párrafo absurdo para pedir música; esto corta los
+# payloads gigantes antes de que Flask los cargue en memoria.
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
+
 @app.route("/")
 def home(): return render_template("index.html")
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
+    ip = request.remote_addr or "desconocida"
+    if not limitador_chat.permitir(ip):
+        metrics.record_bloqueo()
+        logger.info(f"🛑 {ip} superó el límite de {LIMITE_POR_MINUTO} turnos por minuto")
+        return jsonify({
+            "error": ("Demasiadas peticiones seguidas desde tu red. "
+                      "Espera un minuto y vuelve a pedir música."),
+        }), 429
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "JSON inválido: envía el cuerpo en UTF-8"}), 400
-        mensaje = (data.get("message") or "").strip()
-        session_id = (data.get("session_id") or "default").strip()
+        mensaje = (data.get("message") or "").strip()[:500]
+        session_id = (data.get("session_id") or "default").strip()[:64]
         if not mensaje: return jsonify({"error": "Mensaje vacío"}), 400
         resultado = procesar_consulta_echopulse(mensaje, session_id)
         return jsonify(resultado)
@@ -908,7 +1312,6 @@ def api_chat_reset():
 
 @app.route("/api/health")
 def health():
-    estado = llm.estado()
     etiqueta = llm.descripcion()
     return jsonify({
         "status": "ok",
@@ -919,20 +1322,39 @@ def health():
             "module2_retrieval": "loaded",
             "module3_reranker": "loaded",
         },
-        "llm": estado,
-        "device": str(module2.device),
-        "metrics": metrics.get_summary(),
     })
+
+
+def _requiere_admin():
+    """Los endpoints que gastan CPU o cambian estado no quedan abiertos al público.
+
+    /api/llm/probar fuerza una inferencia de Qwen por petición y
+    /api/llm/revive reescribe la lista de proveedores: en una demo pública con
+    la VM abierta 24 h, cualquiera podía tumbar la latencia de los demás. Sin
+    ADMIN_TOKEN definido, ambos responden 404 (el demo no los necesita).
+    """
+    token = os.getenv("ADMIN_TOKEN", "").strip()
+    if not token:
+        return jsonify({"error": "endpoint de diagnóstico deshabilitado"}), 404
+    if (request.headers.get("X-Admin-Token") or "").strip() != token:
+        return jsonify({"error": "token de administración requerido"}), 403
+    return None
 
 
 @app.route("/api/llm/status")
 def llm_status():
+    bloqueado = _requiere_admin()
+    if bloqueado:
+        return bloqueado
     return jsonify(llm.estado())
 
 
 @app.route("/api/llm/revive", methods=["POST"])
 def llm_revive():
     """Reactiva proveedores marcados como caídos (p. ej. tras recargar créditos)."""
+    bloqueado = _requiere_admin()
+    if bloqueado:
+        return bloqueado
     data = request.json or {}
     llm.revivir(data.get("provider"))
     return jsonify({"status": "revived", "llm": llm.estado()})
@@ -941,6 +1363,9 @@ def llm_revive():
 @app.route("/api/llm/probar", methods=["POST"])
 def llm_probar():
     """Prueba real de la cadena de LLM: responde con quién y en cuánto tiempo."""
+    bloqueado = _requiere_admin()
+    if bloqueado:
+        return bloqueado
     salida = llm.chat(
         [{"role": "user", "content": "Responde solo con la palabra: listo"}],
         max_tokens=8,
@@ -958,8 +1383,56 @@ def llm_probar():
         "llm": llm.estado(),
     })
 
+
+@app.route("/api/feedback", methods=["POST"])
+def api_feedback():
+    """📋 Etiqueta de relevancia del usuario sobre el turno que acaba de ver.
+
+    Es la única ground truth alcanzable en la demo: sin ella no existe Hit
+    Rate@K, Recall@K, Precision@K, MRR ni NDCG@K, solo telemetría. Se guarda
+    (session_id + id del evento + valor + canciones) en logs/feedback_*.jsonl
+    para cruzarlo después con logs/events_*.jsonl.
+    """
+    data = request.get_json(silent=True) or {}
+    if not limitador_feedback.permitir(request.remote_addr or "desconocida"):
+        metrics.record_bloqueo()
+        return jsonify({"error": "Demasiados avisos seguidos, espera un momento."}), 429
+    # Topes de longitud: en la demo pública cualquier texto llega directo al log.
+    session_id = (data.get("session_id") or "").strip()[:64]
+    evento_id = (data.get("evento_id") or "").strip()[:80]
+    valor = (data.get("valor") or "").strip().lower()
+    if valor not in ("gust", "no_gust"):
+        return jsonify({"error": "valor debe ser 'gust' o 'no_gust'"}), 400
+    if not evento_id:
+        return jsonify({"error": "falta evento_id del turno"}), 400
+    sesion = CONVERSACIONES.get(session_id) or {}
+    contexto = (sesion.get("etiquetables") or {}).get(evento_id) or {}
+    cancion = (data.get("track_name") or "").strip()[:120]
+    metrics.record_feedback({
+        "session_id": session_id,
+        "evento_id": evento_id,
+        "valor": valor,
+        "track_name": cancion,
+        "turno": contexto.get("turno"),
+        "query_en": contexto.get("query_en", ""),
+        "cobertura_m3": contexto.get("cobertura_m3"),
+    })
+    return jsonify({"status": "ok", "evento_id": evento_id})
+
+
 @app.route("/api/metrics")
-def get_metrics(): return jsonify(metrics.get_summary())
+def get_metrics():
+    """El panel del frontend lo pinta en vivo; en la demo pública sale recortado.
+
+    `errores` guarda los mensajes crudos de las últimas excepciones (pueden
+    citar rutas del contenedor o fragmentos de una consulta). Con ADMIN_TOKEN
+    correcto se devuelve el resumen completo, que es como lo leo desde la VM.
+    """
+    resumen = metrics.get_summary()
+    token = os.getenv("ADMIN_TOKEN", "").strip()
+    if not token or (request.headers.get("X-Admin-Token") or "").strip() != token:
+        resumen["errores"] = []
+    return jsonify(resumen)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))

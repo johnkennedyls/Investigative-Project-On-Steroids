@@ -1,0 +1,20 @@
+# Dependencias del Space (Linux, CPU). Van separadas del requirements.txt
+# del proyecto para no tocar tu entorno local de Windows.
+#
+# Notas de por qué están fijadas:
+#   scikit-learn==1.6.1  → el MinMaxScaler quedó pickled con esa versión dentro
+#                          de mst_mr_final.pth; fijarla evita el warning de
+#                          "InconsistentVersion" al cargar el checkpoint.
+#   numpy<2.3            → compatibilidad con la scipy que arrastra sklearn 1.6.
+#   pyarrow 25.0.1       → fame_index.parquet se generó con pyarrow 25 (formato
+#                          parquet 2.6); con 19 falla con "Repetition level
+#                          histogram size mismatch" y se pierde la señal de fama.
+flask==3.1.0
+gunicorn==23.0.0
+requests==2.32.3
+pandas==2.2.3
+numpy==2.2.6
+scikit-learn==1.6.1
+pyarrow==25.0.1
+python-dotenv==1.0.1
+huggingface_hub==0.30.2

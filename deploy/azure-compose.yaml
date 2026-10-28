@@ -1,0 +1,68 @@
+services:
+  qwen:
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:5741ab30aae42af23ca57d9b98a6d4544cb09c21f372f92c5ee55312fa8b8b0c
+    restart: unless-stopped
+    environment:
+      LLAMA_CACHE: /models
+    volumes:
+      - qwen-models:/models
+    command:
+      - -hf
+      - Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M
+      - --alias
+      - qwen
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - "4096"
+      - --threads
+      - "2"
+      - --threads-batch
+      - "2"
+      - --parallel
+      - "1"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10m
+      retries: 12
+
+  app:
+    build: .
+    image: echopulse-azure:demo
+    user: "1000:1000"
+    restart: unless-stopped
+    depends_on:
+      qwen:
+        condition: service_healthy
+    ports:
+      # Tunnel SSH del tesis (127.0.0.1 no sale a la red) y la puerta pública de
+      # la demo: HTTP plano en 80 porque un HTTPS gratis exige dominio propio.
+      - "127.0.0.1:7860:7860"
+      - "80:7860"
+    environment:
+      PORT: "7860"
+      # Tope de turnos por IP y minuto: un turno de Qwen en CPU tarda ~7 s y la
+      # VM tiene 2 núcleos; sin esto, la cola pública reventaría la latencia.
+      LIMITE_POR_MINUTO: "12"
+      TABLA_MAESTRA_DIR: /app/tabla_maestra/train
+      OLLAMA_ENABLED: "0"
+      LLM_BASE_URL: http://qwen:8080/v1
+      LLM_MODEL: qwen
+      LLM_TIMEOUT: "180"
+      LLM_ORDER: custom
+      # Qwen 1.5B en CPU divaga con la temperatura por defecto (0.7): exclamaciones
+      # sin sentido tipo "¡A la vez más y más!". 0.5 mantiene variedad sin el ruido.
+      LLM_TEMPERATURA_CHAT: "0.5"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    volumes:
+      - app-logs:/app/logs
+
+volumes:
+  qwen-models:
+  app-logs:

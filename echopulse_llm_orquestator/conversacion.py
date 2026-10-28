@@ -34,21 +34,26 @@ SISTEMA_INTENCION = (
 )
 
 SISTEMA_CHAT = (
-    "Eres EchoPulse, un curador musical que conversa como un amigo melómano: cercano, "
+    "Eres un curador musical que conversa como un amigo melómano: cercano, "
     "con criterio y sin sonar a vendedor. "
     "Reglas: "
     "1) Responde SIEMPRE en español, en 2 a 4 frases, tono cálido y natural. "
     "2) Reacciona primero a lo que dijo el usuario (su mood, su pregunta) y después "
     "recomienda. "
     "3) Menciona 2 o 3 canciones de la lista entregada, con su nombre y artista "
-    "exactos; nunca inventes canciones, artistas ni datos. "
+    "exactos; nunca inventes canciones, artistas ni datos. La lista es información "
+    "interna: no copies sus líneas ni su formato (nada de guiones, «» ni corchetes). "
     "4) Nunca muestres IDs, códigos, corchetes ni puntuaciones de similitud. "
     "5) No repitas canciones ya mencionadas antes en la conversación. "
     "6) Si el usuario hace una pregunta en vez de pedir música, respóndela con tu "
     "criterio y luego conecta con la lista. "
-    "7) Cierra con UNA pregunta breve que invite a seguir hablando, distinta cada vez. "
+    "7) Cierra con UNA pregunta breve que invite a seguir hablando, distinta cada "
+    "vez. La pregunta es sobre lo que TÚ acabas de proponer (más fuerte, más suave, "
+    "otro estilo): nunca le pidas al usuario que te recomiende música a ti. "
     "8) Sin viñetas, sin numeración, sin encabezados, sin comillas alrededor de la "
-    "respuesta y con un emoji como máximo."
+    "respuesta y con un emoji como máximo. "
+    "9) Trátalo de tú y no nombres a nadie: ni a ti ni a él (no sabes cómo se "
+    "llama). Empieza directo con tu reacción o con la canción."
 )
 
 PREGUNTAS_SEGUIMIENTO = [
@@ -58,6 +63,15 @@ PREGUNTAS_SEGUIMIENTO = [
     "¿Prefieres algo más tranquilo o nos quedamos con este mood?",
     "¿Le damos otra vuelta con algo más de ese estilo?",
     "¿Buscamos algo parecido pero de otra época?",
+]
+
+# Refuerzo cuando el modelo no citó canciones reales. `{lista}` trae uno o dos
+# pares «título» de artista, así que las frases tienen que funcionar en singular.
+REFUERZOS_CANCION = [
+    "Para que no se pierda, mis apuestas de esta tanda son {lista}.",
+    "De lo que te traje, me mojo por {lista}.",
+    "Si te quedas con algo, quédate con {lista}.",
+    "Lo más directo de esta tanda: {lista}.",
 ]
 
 
@@ -321,6 +335,10 @@ def resumen_para_memoria(mensaje: str) -> str:
 # Control de calidad de la respuesta del LLM
 # =====================================================================
 _RE_CORTE_FRASE = re.compile(r"(?<=[.!?…])\s+")
+# El modelo copia a veces una línea de la lista del prompt:
+#   "- «we cant stop» — miley cyrus [pop]"
+# Se elimina para que la respuesta no parezca un volcado de datos.
+_RE_ECO_LISTA = re.compile(r"[-•]\s*«[^»]{1,150}»\s*[—–-]\s*[^¿?¡!\n]*", re.M)
 
 
 def recortar_frases(texto: str, maximo: int = 5) -> str:
@@ -332,6 +350,30 @@ def recortar_frases(texto: str, maximo: int = 5) -> str:
     if len(frases) <= maximo:
         return texto
     return " ".join(frases[:maximo]).strip()
+
+
+def limpiar_ecos_de_lista(texto: str) -> str:
+    """Quita las líneas de la lista interna que el modelo copia literalmente."""
+    limpio = _RE_ECO_LISTA.sub(" ", texto or "")
+    return normalizar(limpio)
+
+
+# Marcadores de lista suelta: "1." "2)" "-" "•". El prompt prohíbe las viñetas
+# pero Qwen 1.5B las escribe igual, a veces SIN contenido detrás ("1. 2. 3.").
+_RE_MARCADOR_VACIO = re.compile(r"(?:^|\s)(?:\d{1,2}[\).\:]|[-•*])\s*(?=\s|$)")
+_RE_MARCADOR = re.compile(r"(?:^|\s)(?:\d{1,2}[\).\:]|[-•*])\s+")
+
+
+def limpiar_numeraciones(texto: str) -> str:
+    """Elimina las viñetas/numeración que el modelo ignora en el prompt.
+
+    Primero borra los marcadores vacíos (el caso visto en producción: una
+    respuesta que solo decía "1. 2. 3." y la tarjeta quedaba vacía); después
+    aplana los que sí traen texto, conservando el contenido.
+    """
+    limpio = _RE_MARCADOR_VACIO.sub(" ", texto or "")
+    limpio = _RE_MARCADOR.sub(" ", limpio)
+    return normalizar(limpio)
 
 
 def _plano(texto: str) -> str:
@@ -355,7 +397,7 @@ def canciones_citadas(respuesta: str, candidatos: Sequence[dict]) -> list[str]:
 
 
 def garantizar_canciones(
-    respuesta: str, candidatos: Sequence[dict], maximo_frases: int = 5
+    respuesta: str, candidatos: Sequence[dict], maximo_frases: int = 5, turno: int = 0
 ) -> str:
     """Si el modelo no citó ninguna canción real, se añade la lista al final.
 
@@ -363,20 +405,39 @@ def garantizar_canciones(
     mantiene su tono conversacional pero asegura que el usuario reciba
     recomendaciones que existen en el catálogo. Si la respuesta termina en
     pregunta, la lista se inserta antes para que la pregunta siga cerrando.
+
+    El refuerzo rota por turno: en una tanda de "dame más" el modelo suele no
+    citar nada dos veces seguidas, y la misma frase literal delataba al plantel.
     """
+    respuesta = limpiar_ecos_de_lista(respuesta)
     respuesta = recortar_frases(respuesta, maximo_frases)
     if canciones_citadas(respuesta, candidatos):
         return respuesta
     lista = formatear_canciones(candidatos, limite=2)
     if not lista:
         return respuesta
-    refuerzo = f"Para que no se pierda, mis apuestas de esta tanda son {lista}."
+    refuerzo = _elegir(REFUERZOS_CANCION, turno).format(lista=lista)
 
     frases = _RE_CORTE_FRASE.split(respuesta)
     if frases and frases[-1].rstrip().endswith("?"):
         frases.insert(len(frases) - 1, refuerzo)
         return " ".join(frases).strip()
     return f"{respuesta} {refuerzo}".strip()
+
+
+def sin_refuerzos_de_plantilla(texto: str) -> str:
+    """Quita del historial las frases que inyectamos nosotros, no el modelo.
+
+    El historial se reenvía al LLM en cada turno: si guardamos el refuerzo que
+    añadimos porque el modelo no citó ninguna canción, Qwen 1.5B lo imita tal
+    cual turno tras turno y toda la demo repite la misma frase literal.
+    """
+    if not texto:
+        return texto
+    prefijos = [frase.split("{lista}")[0].strip() for frase in REFUERZOS_CANCION]
+    frases = _RE_CORTE_FRASE.split(normalizar(texto))
+    guardadas = [f for f in frases if not any(f.strip().startswith(p) for p in prefijos)]
+    return " ".join(guardadas).strip()
 
 
 def cerrar_con_pregunta(texto: str, turno: int = 0) -> str:
@@ -413,6 +474,113 @@ def descartar_citas_inventadas(texto: str, candidatos: Sequence[dict]) -> str:
             continue
         conservadas.append(frase)
     return " ".join(conservadas).strip()
+
+
+# «Título» de Artista  /  "Título" by Artist  /  «Título» del Artista
+# El par de comillas se agrupa por alternancia (no con \1): « abre y » cierra.
+_RE_CITA_ARTISTA = re.compile(
+    r"(?:«([^«»]{3,80})»|[\"“”']([^\"“”']{3,80})[\"“”'])"
+    r"\s+(de|del|by|from)\s+"
+    r"([^\s«»\"“”'.,;:!?][^«»\"“”'.,;:!?]{0,38})"
+)
+
+
+def corregir_parejas_artista(texto: str, candidatos: Sequence[dict]) -> str:
+    """Reemplaza el artista mal emparejado por el real de esa canción.
+
+    Incidente en producción: «okkervil river» de **Okkervil Riffs** — el título
+    sí venía de la lista, el artista se lo inventó el modelo. Como el catálogo
+    manda, la pareja (título, artista) se corrige en vez de borrar la frase, que
+    es lo que el usuario estaba leyendo bien.
+    """
+    art_por_titulo: dict[str, str] = {}  # plano(título) -> artista real
+    for c in candidatos:
+        titulo = normalizar(c.get("track_name"))
+        if not titulo or titulo.lower() in ("unknown", "none", "nan"):
+            continue
+        artista = normalizar(c.get("artist_name"))
+        if artista and artista.lower() not in ("unknown", "none", "nan"):
+            art_por_titulo.setdefault(_plano(titulo).strip(), artista)
+    if not art_por_titulo:
+        return texto
+
+    def _corregir(m: re.Match) -> str:
+        titulo = (m.group(1) or m.group(2)).strip()
+        conector, artista = m.group(3), m.group(4)
+        real = art_por_titulo.get(_plano(titulo).strip())
+        if not real:
+            return m.group(0)
+        plano_capturado, plano_real = _plano(artista).strip(), _plano(real).strip()
+        if (
+            plano_capturado == plano_real
+            or plano_real in plano_capturado
+            or plano_capturado in plano_real
+        ):
+            return m.group(0)
+        return f"«{titulo}» {conector} {real}"
+
+    return _RE_CITA_ARTISTA.sub(_corregir, texto or "")
+
+
+def texto_aprovechable(texto: str, candidatos: Sequence[dict]) -> bool:
+    """¿Aporta algo la salida del modelo tras la limpieza?
+
+    Si no, el orquestador usa el motor determinista: es mejor una respuesta
+    sobria y correcta que devolver el texto crudo (que puede estar vacío,
+    ser solo numeración o divagación).
+    """
+    if not texto or len(texto) < 25:
+        return False
+    if not re.search(r"[A-Za-zÁÉÍÓÚÜÜÑáéíóúüñ]{3}", texto):
+        return False
+    if not canciones_citadas(texto, candidatos) and not formatear_canciones(candidatos, limite=1):
+        return False
+    return True
+
+
+def soltar_comillas_colgadas(texto: str) -> str:
+    """Tira la última frase si dejó una cita sin cerrar.
+
+    Al recortar por número de frases el modelo se queda a medias
+    («…podrías probar "Dear Mr»). Una cita abierta sin cierre se lee como un
+    fallo del agente, así que es mejor perder esa frase que mostrarla.
+    """
+    frases = _RE_CORTE_FRASE.split(normalizar(texto))
+    while frases and not _citas_balanceadas(frases[-1]):
+        frases.pop()
+    return " ".join(frases).strip()
+
+
+def _citas_balanceadas(frase: str) -> bool:
+    # Los apóstrofes no se cuentan: "Booker T. & the M.G.'s" tiene uno suelto y
+    # es una frase perfectamente cerrada.
+    return (
+        len(re.findall(r"[«“]", frase)) == len(re.findall(r"[»”]", frase))
+        and frase.count('"') % 2 == 0
+    )
+
+
+def validar_respuesta(
+    texto: str, candidatos: Sequence[dict], turno: int = 0, maximo_frases: int = 5
+) -> str | None:
+    """Cadena única de control de calidad sobre la salida del LLM.
+
+    Corrección de parejas → descarte de citas inventadas → limpieza de ecos de
+    la lista interna → eliminación de numeración → recorte de frases → soltar
+    citas a medias → garantía de canción real → pregunta de cierre. Devuelve
+    `None` cuando no queda nada aprovechable: el llamador decide el respaldo, y
+    en ningún caso se reintroduce el texto crudo del modelo.
+    """
+    limpio = corregir_parejas_artista(texto, candidatos)
+    limpio = descartar_citas_inventadas(limpio, candidatos)
+    limpio = limpiar_ecos_de_lista(limpio)
+    limpio = limpiar_numeraciones(limpio)
+    limpio = recortar_frases(limpio, maximo_frases)
+    limpio = soltar_comillas_colgadas(limpio)
+    if not texto_aprovechable(limpio, candidatos):
+        return None
+    garantizada = garantizar_canciones(limpio, candidatos, maximo_frases, turno)
+    return cerrar_con_pregunta(garantizada, turno)
 
 
 # =====================================================================

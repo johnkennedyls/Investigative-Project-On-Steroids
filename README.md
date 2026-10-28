@@ -121,6 +121,36 @@ Other free options (a Hugging Face Space of your own, Groq, Alibaba DashScope)
 are configured in `.env` — see [`.env.example`](echopulse_llm_orquestator/.env.example)
 and the technical write-up [`docs/LLM_QWEN_GRATIS.md`](docs/LLM_QWEN_GRATIS.md).
 
+### Deploy to Hugging Face Spaces
+
+Step-by-step guide (in Spanish, written for a first deployment):
+[`docs/DESPLIEGUE_HF.md`](docs/DESPLIEGUE_HF.md). It covers the three pieces
+(artifacts repo + app Space + Qwen Space), the exact commands, verification and
+the usual build/runtime failures.
+
+```powershell
+python deploy\subir_artefactos.py --dry-run                 # 216 MB de pesos
+powershell -File deploy\preparar_space_app.ps1              # carpeta lista para el Space
+```
+
+### Public demo (Azure VM, 24/7)
+
+`deploy/azure-compose.yaml` runs the whole agent on one Ubuntu VM: the Flask
+orchestrator plus Qwen 2.5-1.5B served by llama.cpp (CPU, no GPU cost) on the
+free Azure for Students credit. Live demo: **http://64.236.242.123/**
+
+```bash
+sudo docker compose up -d --build app     # only the app service, never `down`
+sudo docker compose exec -T app python scripts/evaluar_metricas.py
+```
+
+Plain HTTP (a free HTTPS needs a paid domain), so the guardrails live in the
+app: 12 turns/min per IP on `/api/chat`, 40/min on `/api/feedback`, 16 KB body
+cap, and `/api/llm/*` disabled unless `ADMIN_TOKEN` is set. Every turn is
+appended to `logs/events_*.jsonl` and every 👍/👎 to `logs/feedback_*.jsonl`
+(Docker volume `app-logs`); `scripts/evaluar_metricas.py` crosses them into the
+Hit Rate / Recall / Precision / MRR / NDCG report used by the thesis.
+
 Useful checks:
 
 ```bash

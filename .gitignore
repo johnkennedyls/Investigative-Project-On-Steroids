@@ -20,3 +20,11 @@ env/
 # Plantilla de configuración sin secretos: sí se versiona
 !.env.example
 !**/.env.example
+
+# 📦 Carpeta temporal que genera deploy/preparar_space_app.ps1
+build/
+
+# 📊 Datos de ejecución: latencias, turnos y etiquetas 👍/👎. En la VM viven en el
+# volumen Docker app-logs y desde ahí se saca el informe de la tesis; en el repo
+# solo ruido (y consultas de quien prueba la demo).
+echopulse_llm_orquestator/logs/
