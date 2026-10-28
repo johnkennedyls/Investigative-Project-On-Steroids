@@ -1266,8 +1266,8 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
 app = Flask(__name__)
 
 # Demo pública: un turno llena los 2 núcleos de la VM durante segundos, así que se
-# frena por IP antes de ponerse a calcular. Se usa request.remote_addr y NO
-# X-Forwarded-For: sin proxy inverso delante, ese header lo escribe el cliente.
+# frena por IP antes de ponerse a calcular. limite.ip_cliente decide qué IP contar:
+# la de origen en HTTP directo, y la X-Forwarded-For solo cuando llega de un proxy.
 LIMITE_POR_MINUTO = int(os.getenv("LIMITE_POR_MINUTO", "12"))
 limitador_chat = limite.LimitadorVentana(LIMITE_POR_MINUTO)
 # Los 👍/👎 no gastan el cupo de chat (una tanda admite varios avisos), pero tampoco
@@ -1282,7 +1282,7 @@ def home(): return render_template("index.html")
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    ip = request.remote_addr or "desconocida"
+    ip = limite.ip_cliente(request.remote_addr, request.headers.get("X-Forwarded-For"))
     if not limitador_chat.permitir(ip):
         metrics.record_bloqueo()
         logger.info(f"🛑 {ip} superó el límite de {LIMITE_POR_MINUTO} turnos por minuto")
@@ -1394,7 +1394,9 @@ def api_feedback():
     para cruzarlo después con logs/events_*.jsonl.
     """
     data = request.get_json(silent=True) or {}
-    if not limitador_feedback.permitir(request.remote_addr or "desconocida"):
+    if not limitador_feedback.permitir(
+        limite.ip_cliente(request.remote_addr, request.headers.get("X-Forwarded-For"))
+    ):
         metrics.record_bloqueo()
         return jsonify({"error": "Demasiados avisos seguidos, espera un momento."}), 429
     # Topes de longitud: en la demo pública cualquier texto llega directo al log.

@@ -422,9 +422,22 @@
       let sessionId = almacen.leer("echopulse_session") || idSesion();
       almacen.escribir("echopulse_session", sessionId);
 
+      // ngrok, el túnel HTTPS de la demo, muestra a los navegadores una página de
+      // aviso antes de dejar pasar. Un fetch normal recibiría ese HTML donde espera
+      // JSON y la app fallaría al parsearlo; esta cabecera hace que ngrok lo salte.
+      function pedir(url, init = {}) {
+        return fetch(url, {
+          ...init,
+          headers: {
+            ...(init.headers || {}),
+            "ngrok-skip-browser-warning": "1",
+          },
+        });
+      }
+
       async function nuevaConversacion() {
         try {
-          await fetch("/api/chat/reset", {
+          await pedir("/api/chat/reset", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ session_id: sessionId }),
@@ -478,7 +491,7 @@
 
       async function refreshMetrics() {
         try {
-          const res = await fetch("/api/metrics");
+          const res = await pedir("/api/metrics");
           const data = await res.json();
           document.getElementById("metric-total").textContent =
             data.total_queries || 0;
@@ -662,7 +675,7 @@
         const primera =
           registro.module3_reranked?.find((c) => cancionVisible(c)) || {};
         try {
-          const res = await fetch("/api/feedback", {
+          const res = await pedir("/api/feedback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -814,7 +827,7 @@
         resetPipeline();
         input.focus();
         try {
-          const res = await fetch("/api/chat", {
+          const res = await pedir("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: msg, session_id: sessionId }),
@@ -852,7 +865,7 @@
 
       async function checkHealth() {
         try {
-          const res = await fetch("/api/health", { cache: "no-store" });
+          const res = await pedir("/api/health", { cache: "no-store" });
           const data = await res.json();
           if (data.status === "ok") {
             const motor = data.modules.llm || data.modules.hf_api || "ONLINE";

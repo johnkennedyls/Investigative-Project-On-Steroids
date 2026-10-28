@@ -9,12 +9,43 @@ de ponerse a trabajar.
 
 from __future__ import annotations
 
+import ipaddress
 import time
 from threading import Lock
 
 # Techo de IPs recordadas: con esto la tabla no crece sin límite si alguien
 # rota direcciones de origen.
 MAX_IPS_VIGILADAS = 5000
+
+
+def _es_proxy_local(direccion: str) -> bool:
+    """True si la conexión viene de una red que no puede ser un cliente de internet.
+
+    Se usa `is_global` y no `is_private` porque el conjunto de direcciones
+    reservadas (loopback, link-local, CGNAT, rangos de documentación) es lo que de
+    verdad distingue al túnel ngrok de un visitante real.
+    """
+    try:
+        return not ipaddress.ip_address(direccion).is_global
+    except ValueError:
+        return False
+
+
+def ip_cliente(remote_addr: str | None, x_forwarded_for: str | None) -> str:
+    """De quién es la petición, distinguiendo visita directa de visita tras proxy.
+
+    Con el túnel ngrok el TLS termina fuera del contenedor y la conexión llega
+    desde la red Docker: si solo se mirara `remote_addr`, todos los visitantes
+    compartirían el mismo cubo del límite. La cabecera `X-Forwarded-For` solo se
+    cree cuando quien llama ya es el proxy, porque si no cualquiera la inventa
+    para saltarse el freno.
+    """
+    origen = (remote_addr or "").strip()
+    if x_forwarded_for and _es_proxy_local(origen):
+        primero = x_forwarded_for.split(",")[0].strip()
+        if primero:
+            return primero
+    return origen or "desconocida"
 
 
 class LimitadorVentana:

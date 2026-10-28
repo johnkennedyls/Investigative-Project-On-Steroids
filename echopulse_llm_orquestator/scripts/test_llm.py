@@ -615,6 +615,32 @@ def test_el_limite_por_ip_frena_el_spam():
     print("✅ Límite por IP: ventana deslizante de 3/min con la cola protegida")
 
 
+def test_la_cabecera_xff_solo_vale_detras_del_proxy():
+    """Con el túnel ngrok el origen real viene en X-Forwarded-For, no en la conexión.
+
+    Sin leer esa cabecera todos los visitantes caerían en el mismo cubo del límite
+    (y 12 turnos/min se quedarían cortísimos). Pero la cabecera solo se cree si
+    quien llama es una IP privada: si no, cualquiera la inventa para saltárselo.
+    """
+    import limite
+
+    detras_del_proxy = limite.ip_cliente("172.18.0.5", "8.8.8.8, 172.18.0.5")
+    assert detras_del_proxy == "8.8.8.8", detras_del_proxy
+    # HTTP directo (puerto 80 abierto): manda la conexión, la cabecera es ruido.
+    directo = limite.ip_cliente("8.8.8.8", "1.1.1.1")
+    assert directo == "8.8.8.8", directo
+    assert limite.ip_cliente("172.18.0.5", None) == "172.18.0.5"
+    assert limite.ip_cliente(None, "8.8.8.8") == "desconocida"
+
+    # Cada visitante real ocupa su propio cubo; el que repite, frena.
+    lim = limite.LimitadorVentana(limite=1, ventana=60.0)
+    t0 = 500.0
+    assert lim.permitir(limite.ip_cliente("172.18.0.5", "8.8.8.8"), t0)
+    assert lim.permitir(limite.ip_cliente("172.18.0.5", "1.1.1.1"), t0)
+    assert not lim.permitir(limite.ip_cliente("172.18.0.5", "8.8.8.8"), t0 + 1)
+    print("✅ IP del visitante: X-Forwarded-For solo detrás del proxy")
+
+
 def main() -> int:
     pruebas = [
         test_limpieza_think,
@@ -640,6 +666,7 @@ def main() -> int:
         test_rerank_cobertura_y_neutro,
         test_metricas_ranking,
         test_el_limite_por_ip_frena_el_spam,
+        test_la_cabecera_xff_solo_vale_detras_del_proxy,
     ]
     fallos = 0
     for prueba in pruebas:

@@ -63,6 +63,37 @@ services:
     volumes:
       - app-logs:/app/logs
 
+  # HTTPS gratis sin comprar dominio: ngrok termina el TLS fuera de la VM y desde
+  # ahí baja al contenedor, así que la VM solo hace conexiones SALIENTES y el NSG
+  # puede cerrar el puerto 80. El token vive en .env de esta carpeta (chmod 600),
+  # nunca en el repo. Es opcional: sin `--profile tunnel` no se crea ni se pide.
+  tunnel:
+    image: ngrok/ngrok:alpine
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      # La imagen de ngrok no trae shell (es Nix), así que no se puede entrar al
+      # contenedor a leer el inspector: con el log del agente en stdout la URL
+      # asignada sale en `docker logs echopulse-tunnel-1`.
+      NGROK_LOG: /dev/stdout
+      NGROK_LOG_FORMAT: logfmt
+    ports:
+      # Inspector web de ngrok, solo en loopback (127.0.0.1 nunca sale a la red).
+      # Sirve para comprobar desde la VM que ngrok reenvía X-Forwarded-For, que es
+      # como el limiter de la app distingue a cada visitante.
+      - "127.0.0.1:4040:4040"
+    command:
+      - http
+      - app:7860
+      # Dominio gratuito reservado en la cuenta ngrok: fijarlo con --url en vez de
+      # dejar que ngrok asigne uno al azar hace que el enlace de la tesis sea el
+      # mismo para siempre, aunque se reinicie la VM. No es un secreto (es la URL
+      # pública); el token sí vive solo en .env de la VM.
+      - --url=https://myself-private-trilogy.ngrok-free.dev
+
 volumes:
   qwen-models:
   app-logs:

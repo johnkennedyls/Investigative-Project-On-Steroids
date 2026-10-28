@@ -137,19 +137,33 @@ powershell -File deploy\preparar_space_app.ps1              # carpeta lista para
 
 `deploy/azure-compose.yaml` runs the whole agent on one Ubuntu VM: the Flask
 orchestrator plus Qwen 2.5-1.5B served by llama.cpp (CPU, no GPU cost) on the
-free Azure for Students credit. Live demo: **http://64.236.242.123/**
+free Azure for Students credit. Live demo: **https://myself-private-trilogy.ngrok-free.dev/**
 
 ```bash
 sudo docker compose up -d --build app     # only the app service, never `down`
+sudo docker compose --profile tunnel up -d tunnel   # HTTPS tunnel (needs NGROK_AUTHTOKEN in .env)
 sudo docker compose exec -T app python scripts/evaluar_metricas.py
 ```
 
-Plain HTTP (a free HTTPS needs a paid domain), so the guardrails live in the
-app: 12 turns/min per IP on `/api/chat`, 40/min on `/api/feedback`, 16 KB body
-cap, and `/api/llm/*` disabled unless `ADMIN_TOKEN` is set. Every turn is
-appended to `logs/events_*.jsonl` and every 👍/👎 to `logs/feedback_*.jsonl`
-(Docker volume `app-logs`); `scripts/evaluar_metricas.py` crosses them into the
-Hit Rate / Recall / Precision / MRR / NDCG report used by the thesis.
+The link is HTTPS because ngrok terminates TLS outside the VM: the VM only makes
+outbound connections, so inbound port 80 is closed at the NSG
+(`az network nsg rule update -g rg-echopulse-demo --nsg-name echopulse-demo-nsg -n permitir-web-80 --access Deny`;
+`--access Allow` restores plain HTTP on `64.236.242.123` if the tunnel quota runs out).
+ngrok's free tier shows visitors a one-time warning page, suppressed for 7 days by
+its cookie and skipped by the `ngrok-skip-browser-warning` header that `index.html`
+sends on every `fetch`, so the JSON calls never receive HTML. Quota to watch in the
+ngrok dashboard: 20,000 requests and 1 GB out per month (one page load plus a turn
+is ~100 KB).
+
+Guardrails in the app: 12 turns/min per IP on `/api/chat`, 40/min on `/api/feedback`,
+16 KB body cap, and `/api/llm/*` disabled unless `ADMIN_TOKEN` is set. Behind the
+tunnel the visitor IP arrives in `X-Forwarded-For`, and `limite.ip_cliente` only
+trusts that header when the connection comes from the tunnel (otherwise the whole
+public would share one bucket, and anyone could forge the header to escape the limit).
+Every turn is appended to `logs/events_*.jsonl` and every 👍/👎 to
+`logs/feedback_*.jsonl` (Docker volume `app-logs`); `scripts/evaluar_metricas.py`
+crosses them into the Hit Rate / Recall / Precision / MRR / NDCG report used by the
+thesis.
 
 Useful checks:
 
