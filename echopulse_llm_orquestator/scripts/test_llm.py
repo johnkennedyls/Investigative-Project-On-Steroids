@@ -672,12 +672,14 @@ def test_la_voz_no_puede_citar_fuera_de_las_tarjetas():
     print("✅ La voz cita solo las tarjetas: nada de más abajo del ranking")
 
 
-def test_el_eco_del_prompt_no_llega_a_la_calle():
-    """La voz no puede recitar el formato interno de la lista.
+def test_el_eco_del_prompt_se_traduce_a_lenguaje_hablado():
+    """El volcado de la lista interna tiene que sonar a frase, no a datos.
 
     Pasillo real: Qwen devolvió `"Add Some Music to Your Day" — The Beach Boys [Pop]`
-    y las tarjetas mostraban esas mismas canciones, pero la respuesta parecía un
-    volcado de datos. Además una fila sin nombre real no puede ser recomendación.
+    y las tarjetas mostraban esas mismas canciones. Borrar el eco dejaba una frase
+    huérfana ("te recomiendo: Es una canción suave…"), así que se traduce al formato
+    hablado que el prompt pide. Además una fila sin nombre real no puede ser
+    recomendación.
     """
     import conversacion
 
@@ -687,9 +689,14 @@ def test_el_eco_del_prompt_no_llega_a_la_calle():
     )
     limpio = conversacion.limpiar_ecos_de_lista(eco)
     assert "—" not in limpio, limpio
+    assert '"' not in limpio, limpio
     assert "[Pop]" not in limpio and "[pop]" not in limpio.lower(), limpio
-    assert "Beach Boys" not in limpio, limpio
+    assert limpio.count("«") == 2, limpio
+    assert "de The Beach Boys" in limpio and "de Sarah Mclachlan" in limpio, limpio
     assert "concentrarte" in limpio, limpio
+
+    legitima = "Te dejo «say yeah» de wiz khalifa. ¿Seguimos?"
+    assert conversacion.limpiar_ecos_de_lista(legitima) == legitima, legitima
 
     mixta = [
         {"track_name": "unknown", "artist_name": "the beach boys"},
@@ -698,7 +705,7 @@ def test_el_eco_del_prompt_no_llega_a_la_calle():
     reales = conversacion.canciones_reales(mixta)
     assert [c["track_name"] for c in reales] == ["i love you"], reales
     assert conversacion.canciones_reales([mixta[0]]), "nunca puede quedar vacía"
-    print("✅ El eco del prompt y las filas sin nombre no llegan al usuario")
+    print("✅ El eco del prompt se habla en natural y las filas sin nombre se descartan")
 
 
 def main() -> int:
@@ -728,7 +735,7 @@ def main() -> int:
         test_el_limite_por_ip_frena_el_spam,
         test_la_cabecera_xff_solo_vale_detras_del_proxy,
         test_la_voz_no_puede_citar_fuera_de_las_tarjetas,
-        test_el_eco_del_prompt_no_llega_a_la_calle,
+        test_el_eco_del_prompt_se_traduce_a_lenguaje_hablado,
     ]
     fallos = 0
     for prueba in pruebas:

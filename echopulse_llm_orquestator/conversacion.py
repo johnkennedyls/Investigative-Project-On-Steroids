@@ -371,24 +371,38 @@ def recortar_frases(texto: str, maximo: int = 5) -> str:
 # Eco SIN viñeta: el modelo copia la línea del prompt pero sin el guion inicial, y a
 # veces con comillas rectas en vez de «». Vista en producción: la voz dijo
 #   "Add Some Music to Your Day" — The Beach Boys [Pop] "i love you" — Sarah Mclachlan [Pop]
-# mientras las tarjetas mostraban las mismas tres canciones en otro orden. Se quita
-# la pareja citada entera (título, guion largo y artista) porque las tarjetas ya la
-# llevan bien formada, con enlace a Spotify. Solo vale para las comillas rectas:
-# las «angulares» son el formato que el propio prompt pide, borrarlas castigaría
-# una respuesta correcta.
-_RE_ECO_GUION = re.compile(
-    r"[\"“”'][^\"“”']{2,80}[\"“”']\s*[—–]\s*"
-    r"[^\"“”'—–.!?…\n]{1,60}?"
+# Se traduce al lenguaje hablado («título» de artista) en vez de borrarlo: borrar la
+# pareja dejaba frases huérfanas del tipo "te recomiendo: Es una canción suave…".
+# Solo vale para comillas rectas; las «angulares» son el formato que el prompt pide,
+# borrarlas castigaría una respuesta correcta.
+_PAR_ECO = (
+    r"[\"“”']([^\"“”']{2,80})[\"“”']\s*[—–]\s*"
+    r"([^\"“”'—–.!?…\n]{1,60}?)"
     r"(?=\s*(?:[\"“”']|\[[^\]]{1,40}\]|[.!?…]|$))"
 )
+_RE_ECO_PAREJA = re.compile(_PAR_ECO)
+_GAP_ECO = r"(?:\s*\[[^\]]{1,40}\])*\s*"
+# Dos pares seguidos son un volcado del prompt: se unen con comas para que suene a
+# frase y no a lista.
+_RE_ECO_CADENA = re.compile(rf"{_PAR_ECO}(?:{_GAP_ECO}{_PAR_ECO})*")
 # El corchete de género es notación interna del prompt; nunca debe verse.
 _RE_CORCHETE_GENERO = re.compile(r"\s*\[[^\]]{1,40}\]")
 
 
+def _traducir_eco(bloque: str) -> str:
+    pares = _RE_ECO_PAREJA.findall(bloque)
+    citas = [f"«{normalizar(t)}» de {normalizar(a)}" for t, a in pares if t.strip() and a.strip()]
+    if not citas:
+        return bloque
+    if len(citas) == 1:
+        return citas[0]
+    return ", ".join(citas[:-1]) + " y " + citas[-1]
+
+
 def limpiar_ecos_de_lista(texto: str) -> str:
-    """Quita las líneas de la lista interna que el modelo copia literalmente."""
+    """Pasa la lista interna copiada literalmente a lenguaje hablado."""
     limpio = _RE_ECO_LISTA.sub(" ", texto or "")
-    limpio = _RE_ECO_GUION.sub(" ", limpio)
+    limpio = _RE_ECO_CADENA.sub(lambda m: _traducir_eco(m.group(0)), limpio)
     limpio = _RE_CORCHETE_GENERO.sub("", limpio)
     return normalizar(limpio)
 
