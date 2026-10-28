@@ -94,6 +94,24 @@ services:
       # pública); el token sí vive solo en .env de la VM.
       - --url=https://myself-private-trilogy.ngrok-free.dev
 
+  # El plan gratis de ngrok interpone una página de aviso a todo el tráfico HTML de
+  # navegador (se quita solo pagando o con cabeceras, y un navegador no puede poner
+  # cabeceras al abrir el enlace). Cloudflare Quick Tunnel da HTTPS gratis sin ese
+  # aviso y sin cuenta. La contra: la URL *.trycloudflare.com se asigna al arrancar,
+  # así que si el contenedor se reinicia cambia; el ngrok de arriba queda de respaldo
+  # con enlace fijo.
+  tunnel-cf:
+    image: cloudflare/cloudflared:latest
+    profiles: ["cf"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://app:7860
+
 volumes:
   qwen-models:
   app-logs:

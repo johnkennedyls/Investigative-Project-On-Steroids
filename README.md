@@ -137,23 +137,33 @@ powershell -File deploy\preparar_space_app.ps1              # carpeta lista para
 
 `deploy/azure-compose.yaml` runs the whole agent on one Ubuntu VM: the Flask
 orchestrator plus Qwen 2.5-1.5B served by llama.cpp (CPU, no GPU cost) on the
-free Azure for Students credit. Live demo: **https://myself-private-trilogy.ngrok-free.dev/**
+free Azure for Students credit. Link to share (nothing in front of the app):
+**https://zero-programming-opens-detroit.trycloudflare.com/**
 
 ```bash
 sudo docker compose up -d --build app     # only the app service, never `down`
-sudo docker compose --profile tunnel up -d tunnel   # HTTPS tunnel (needs NGROK_AUTHTOKEN in .env)
+sudo docker compose --profile cf up -d tunnel-cf          # Cloudflare tunnel (no token needed)
+sudo docker compose --profile tunnel up -d tunnel         # ngrok backup (NGROK_AUTHTOKEN in .env)
 sudo docker compose exec -T app python scripts/evaluar_metricas.py
 ```
 
-The link is HTTPS because ngrok terminates TLS outside the VM: the VM only makes
-outbound connections, so inbound port 80 is closed at the NSG
+Two tunnels for two different needs. Cloudflare Quick Tunnels are free, need no
+account and show no interstitial, but the `*.trycloudflare.com` hostname is assigned
+when the tunnel starts: after a restart the link changes, so re-read it with
+`sudo docker logs echopulse-tunnel-cf-1 | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'`
+and re-share it. ngrok keeps a permanent hostname
+(**https://myself-private-trilogy.ngrok-free.dev/**) as the fallback; its free tier
+puts a one-time warning page in front of browser traffic, which a browser cannot skip
+with a header (the cookie hides it for 7 days), and `index.html` sends
+`ngrok-skip-browser-warning` on every `fetch` so the JSON calls never receive HTML.
+Quotas to watch: ngrok 20,000 requests and 1 GB out per month; Quick Tunnels have no
+uptime guarantee and answer 429 above 200 in-flight requests, which the 12 turns/min
+per IP cap keeps far away.
+
+Both tunnels terminate TLS outside the VM, so the VM only makes outbound connections
+and inbound port 80 stays closed at the NSG
 (`az network nsg rule update -g rg-echopulse-demo --nsg-name echopulse-demo-nsg -n permitir-web-80 --access Deny`;
-`--access Allow` restores plain HTTP on `64.236.242.123` if the tunnel quota runs out).
-ngrok's free tier shows visitors a one-time warning page, suppressed for 7 days by
-its cookie and skipped by the `ngrok-skip-browser-warning` header that `index.html`
-sends on every `fetch`, so the JSON calls never receive HTML. Quota to watch in the
-ngrok dashboard: 20,000 requests and 1 GB out per month (one page load plus a turn
-is ~100 KB).
+`--access Allow` restores plain HTTP on `64.236.242.123`).
 
 Guardrails in the app: 12 turns/min per IP on `/api/chat`, 40/min on `/api/feedback`,
 16 KB body cap, and `/api/llm/*` disabled unless `ADMIN_TOKEN` is set. Behind the
