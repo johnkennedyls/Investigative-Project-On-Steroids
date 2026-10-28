@@ -628,7 +628,7 @@
         // Las recomendaciones finales siempre vienen del re-ranker (Módulo 3)
         if (metadata?.module3_reranked?.length) {
           const cards = metadata.module3_reranked
-            .slice(0, 3)
+            .slice(0, metadata.destacadas || 3)
             .map((song) => tarjetaCancion(song))
             .join("");
           extra += `<div class="mt-2.5 pt-2.5 border-t border-slate-700/40"><p class="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Recomendaciones para ti</p><div class="space-y-1.5">${cards}</div></div>`;

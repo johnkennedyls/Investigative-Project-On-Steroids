@@ -252,6 +252,13 @@ MAX_MENSAJES_HISTORIAL = 10
 SESION_TTL_SEGUNDOS = 2 * 60 * 60  # 2 horas sin actividad → la sesión expira
 MAX_SESIONES = int(os.getenv("MAX_SESIONES", "500"))  # techo de memoria en la VM
 
+# Canciones que se muestran como tarjetas en el turno. Es UN solo número porque
+# manda en tres sitios: la lista que lee Qwen en el prompt, la lista contra la que
+# `validar_respuesta` descarta citas, y el `slice` del frontend (llega como
+# `destacadas`). Antes el prompt veía 6 y la validación 10, así que la voz podía
+# nombrar canciones que no estaban en las tarjetas.
+DESTACADAS = int(os.getenv("DESTACADAS", "3"))
+
 def obtener_sesion(session_id: str) -> dict:
     ahora = time.time()
     for sid in [s for s, d in CONVERSACIONES.items() if ahora - d["ts"] > SESION_TTL_SEGUNDOS]:
@@ -1079,7 +1086,8 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
         print("💬 Fase 4: Generando respuesta conversacional con Qwen...")
         t4 = time.time()
         lineas_contexto = []
-        for c in candidates_final[:6]:
+        destacadas = candidates_final[:DESTACADAS]
+        for c in destacadas:
             nombre = (c.get("track_name") or "").strip() or "Canción sin título"
             artista = (c.get("artist_name") or "").strip() or "artista desconocido"
             genero = _genero_principal(c)
@@ -1118,7 +1126,7 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
             # que volvía a inyectar el texto crudo exactamente cuando la limpieza
             # había descartado todo.
             respuesta_final = conversacion.validar_respuesta(
-                salida_chat.texto, candidates_final, turno=turno, maximo_frases=5
+                salida_chat.texto, destacadas, turno=turno, maximo_frases=5
             )
             modo_respuesta = salida_chat.proveedor
             if respuesta_final is None:
@@ -1146,7 +1154,7 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
         sesion["messages"] = sesion["messages"][-2 * MAX_MENSAJES_HISTORIAL:]
         sesion["turnos"] = turno + 1
         nombres = [
-            c.get("track_name") for c in candidates_final[:3]
+            c.get("track_name") for c in destacadas
             if not _vacio(c.get("track_name"))
         ]
         sesion["ultimos_nombres"] = nombres
@@ -1234,6 +1242,9 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
             "response": respuesta_final, "query_en": query_en, "session_id": session_id,
             "module2_retrieval": candidatos,  # 🔍 Retrieval entregado al re-ranker
             "module3_reranked": candidates_final,  # 🎯 Resultados finales re-ordenados
+            # Cuántas de ellas se muestran como tarjetas: el frontend corta por este
+            # número para que la voz y las tarjetas sean siempre la misma tanda.
+            "destacadas": DESTACADAS,
             "stages": ["translation", "retrieval_m2", "reranking_m3", "generation"],
             "latencies_ms": {k: round(v, 1) for k, v in stage_latencies.items()},
             "llm": {

@@ -470,9 +470,12 @@ def descartar_citas_inventadas(texto: str, candidatos: Sequence[dict]) -> str:
     conservadas: list[str] = []
     for frase in _RE_CORTE_FRASE.split(normalizar(texto)):
         citas = _RE_CITA.findall(frase)
-        if citas and not any(_plano(cita).strip() in validos for cita in citas):
-            continue
-        conservadas.append(frase)
+        # `any` bastaba mientras el prompt y la validación veían los mismos 10
+        # títulos; ahora la tanda son las tarjetas y una frase mezclada ("«say
+        # yeah» y «blackout»") tiene una cita buena y una que no se muestra, así
+        # que se descarta solo si TODAS las citas de la frase son de la lista.
+        if citas and all(_plano(cita).strip() in validos for cita in citas):
+            conservadas.append(frase)
     return " ".join(conservadas).strip()
 
 
@@ -565,11 +568,11 @@ def validar_respuesta(
 ) -> str | None:
     """Cadena única de control de calidad sobre la salida del LLM.
 
-    Corrección de parejas → descarte de citas inventadas → limpieza de ecos de
-    la lista interna → eliminación de numeración → recorte de frases → soltar
-    citas a medias → garantía de canción real → pregunta de cierre. Devuelve
-    `None` cuando no queda nada aprovechable: el llamador decide el respaldo, y
-    en ningún caso se reintroduce el texto crudo del modelo.
+    Corrección de parejas → descarte de citas por fuera de la tanda → limpieza de ecos
+    de la lista interna → eliminación de numeración → recorte de frases → soltar
+    citas a medias → garantía de canción real → pregunta de cierre. Devuelve `None`
+    cuando no queda nada aprovechable: el llamador decide el respaldo, y en ningún
+    caso se reintroduce el texto crudo del modelo.
     """
     limpio = corregir_parejas_artista(texto, candidatos)
     limpio = descartar_citas_inventadas(limpio, candidatos)

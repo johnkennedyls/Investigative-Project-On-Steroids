@@ -641,6 +641,37 @@ def test_la_cabecera_xff_solo_vale_detras_del_proxy():
     print("✅ IP del visitante: X-Forwarded-For solo detrás del proxy")
 
 
+def test_la_voz_no_puede_citar_fuera_de_las_tarjetas():
+    """Lo que Qwen nombra tiene que estar entre las canciones que se ven.
+
+    Incidente real: la voz decía "Shes Always Singing — The Dear Hunter" y
+    "Still Im Sad — The Yardbirds" cuando las tarjetas mostraban otras tres. El
+    orquestador ahora da a validar solo las `destacadas` (las mismas que corta el
+    frontend), así que una cita de más abajo del ranking se cae frase a frase.
+    """
+    import conversacion
+
+    tarjetas = [
+        {"track_name": "say yeah", "artist_name": "wiz khalifa"},
+        {"track_name": "my time", "artist_name": "fabolous"},
+        {"track_name": "pusha man", "artist_name": "chance the rapper"},
+    ]
+    mas_abajo = {"track_name": "blackout", "artist_name": "breathe carolina"}
+    cita_inventada = 'Te dejo «say yeah» de wiz khalifa. También suena «blackout».'
+
+    con_tarjetas = conversacion.descartar_citas_inventadas(cita_inventada, tarjetas)
+    assert "blackout" not in con_tarjetas.lower(), con_tarjetas
+    assert "say yeah" in con_tarjetas.lower(), con_tarjetas
+
+    # Con la lista larga del prompt viejo la misma cita pasaba: recortar a las
+    # destacadas es lo que cierra la puerta.
+    con_lista_larga = conversacion.descartar_citas_inventadas(
+        cita_inventada, tarjetas + [mas_abajo]
+    )
+    assert "blackout" in con_lista_larga.lower(), con_lista_larga
+    print("✅ La voz cita solo las tarjetas: nada de más abajo del ranking")
+
+
 def main() -> int:
     pruebas = [
         test_limpieza_think,
@@ -667,6 +698,7 @@ def main() -> int:
         test_metricas_ranking,
         test_el_limite_por_ip_frena_el_spam,
         test_la_cabecera_xff_solo_vale_detras_del_proxy,
+        test_la_voz_no_puede_citar_fuera_de_las_tarjetas,
     ]
     fallos = 0
     for prueba in pruebas:
