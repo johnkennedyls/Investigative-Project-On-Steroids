@@ -259,6 +259,13 @@ MAX_SESIONES = int(os.getenv("MAX_SESIONES", "500"))  # techo de memoria en la V
 # nombrar canciones que no estaban en las tarjetas.
 DESTACADAS = int(os.getenv("DESTACADAS", "3"))
 
+# Cuestionario de la tesis: lo llenan los visitantes después de probar la demo.
+# Es la única fuente de la URL (aparece en el encabezado y en el mensaje de bienvenida).
+ENCUESTA_URL = os.getenv(
+    "ENCUESTA_URL",
+    "https://docs.google.com/forms/d/e/1FAIpQLSeZoEwQdSXXJh6aRMbbqK8QRgdJc8NVQDlryhJqoCoW6XjGCQ/viewform",
+)
+
 def obtener_sesion(session_id: str) -> dict:
     ahora = time.time()
     for sid in [s for s, d in CONVERSACIONES.items() if ahora - d["ts"] > SESION_TTL_SEGUNDOS]:
@@ -1289,7 +1296,7 @@ limitador_feedback = limite.LimitadorVentana(int(os.getenv("LIMITE_FEEDBACK", "4
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
 @app.route("/")
-def home(): return render_template("index.html")
+def home(): return render_template("index.html", encuesta_url=ENCUESTA_URL)
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():

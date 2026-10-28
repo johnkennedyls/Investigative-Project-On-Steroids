@@ -97,6 +97,16 @@
           </h1>
         </div>
         <div class="flex items-center gap-3">
+          <a
+            href="{{ encuesta_url }}"
+            target="_blank"
+            rel="noopener"
+            class="px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 rounded-lg border border-slate-700/50 transition flex items-center gap-1.5"
+            title="Encuesta de la tesis: 20 preguntas cortas, no pide conocimientos técnicos"
+          >
+            <i class="fas fa-clipboard-list text-[10px]"></i>
+            <span class="hidden sm:inline">Encuesta</span>
+          </a>
           <button
             onclick="nuevaConversacion()"
             class="px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 rounded-lg border border-slate-700/50 transition flex items-center gap-1.5"
@@ -285,6 +295,18 @@
               Demo de tesis: los 👍/👎 que des se guardan como etiquetas de
               relevancia para calcular Hit Rate, MRR y NDCG. Un turno tarda ~7 s
               (Qwen en CPU) y hay un tope de 12 consultas por minuto.
+            </p>
+            <p class="text-slate-400 mt-2 text-xs leading-snug">
+              Después de probar un par de turnos, por favor responde la
+              <a
+                href="{{ encuesta_url }}"
+                target="_blank"
+                rel="noopener"
+                class="text-blue-400 underline decoration-blue-500/40 hover:text-blue-300"
+                >encuesta de evaluación</a
+              >
+              (20 preguntas cortas, ~3 min, sin tecnicismos). Es la que alimenta
+              la parte qualitativa de la tesis.
             </p>
             <div class="flex flex-wrap gap-1.5 mt-2.5">
               <button

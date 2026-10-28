@@ -175,6 +175,12 @@ Every turn is appended to `logs/events_*.jsonl` and every 👍/👎 to
 crosses them into the Hit Rate / Recall / Precision / MRR / NDCG report used by the
 thesis.
 
+The quantitative log is only half of the evaluation: visitors are also asked to fill
+the [experience survey](https://docs.google.com/forms/d/e/1FAIpQLSeZoEwQdSXXJh6aRMbbqK8QRgdJc8NVQDlryhJqoCoW6XjGCQ/viewform)
+(20 short items, no technical background needed). The link is rendered from
+`ENCUESTA_URL` in the sticky header and in the welcome message, so it stays reachable
+while the chat scrolls.
+
 Useful checks:
 
 ```bash
