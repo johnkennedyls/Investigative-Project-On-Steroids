@@ -627,7 +627,15 @@
         }
         // Las recomendaciones finales siempre vienen del re-ranker (Módulo 3)
         if (metadata?.module3_reranked?.length) {
+          // Las filas sin nombre real no se muestran: el backend las excluye de la
+          // tanda que le da a Qwen (`canciones_reales`), así que aquí se filtra lo
+          // mismo para que tarjeta y voz sigan hablando de lo mismo.
+          const conNombre = (c) => {
+            const t = String(c.track_name || "").trim().toLowerCase();
+            return t && !["unknown", "none", "nan"].includes(t);
+          };
           const cards = metadata.module3_reranked
+            .filter(conNombre)
             .slice(0, metadata.destacadas || 3)
             .map((song) => tarjetaCancion(song))
             .join("");

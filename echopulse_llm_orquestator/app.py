@@ -1086,7 +1086,7 @@ def procesar_consulta_echopulse(mensaje_usuario, session_id="default"):
         print("💬 Fase 4: Generando respuesta conversacional con Qwen...")
         t4 = time.time()
         lineas_contexto = []
-        destacadas = candidates_final[:DESTACADAS]
+        destacadas = conversacion.canciones_reales(candidates_final[:DESTACADAS])
         for c in destacadas:
             nombre = (c.get("track_name") or "").strip() or "Canción sin título"
             artista = (c.get("artist_name") or "").strip() or "artista desconocido"

@@ -672,6 +672,35 @@ def test_la_voz_no_puede_citar_fuera_de_las_tarjetas():
     print("✅ La voz cita solo las tarjetas: nada de más abajo del ranking")
 
 
+def test_el_eco_del_prompt_no_llega_a_la_calle():
+    """La voz no puede recitar el formato interno de la lista.
+
+    Pasillo real: Qwen devolvió `"Add Some Music to Your Day" — The Beach Boys [Pop]`
+    y las tarjetas mostraban esas mismas canciones, pero la respuesta parecía un
+    volcado de datos. Además una fila sin nombre real no puede ser recomendación.
+    """
+    import conversacion
+
+    eco = (
+        '"Add Some Music to Your Day" — The Beach Boys [Pop] "i love you" — '
+        "Sarah Mclachlan [Pop] Espero que te ayude a concentrarte."
+    )
+    limpio = conversacion.limpiar_ecos_de_lista(eco)
+    assert "—" not in limpio, limpio
+    assert "[Pop]" not in limpio and "[pop]" not in limpio.lower(), limpio
+    assert "Beach Boys" not in limpio, limpio
+    assert "concentrarte" in limpio, limpio
+
+    mixta = [
+        {"track_name": "unknown", "artist_name": "the beach boys"},
+        {"track_name": "i love you", "artist_name": "sarah mclachlan"},
+    ]
+    reales = conversacion.canciones_reales(mixta)
+    assert [c["track_name"] for c in reales] == ["i love you"], reales
+    assert conversacion.canciones_reales([mixta[0]]), "nunca puede quedar vacía"
+    print("✅ El eco del prompt y las filas sin nombre no llegan al usuario")
+
+
 def main() -> int:
     pruebas = [
         test_limpieza_think,
@@ -699,6 +728,7 @@ def main() -> int:
         test_el_limite_por_ip_frena_el_spam,
         test_la_cabecera_xff_solo_vale_detras_del_proxy,
         test_la_voz_no_puede_citar_fuera_de_las_tarjetas,
+        test_el_eco_del_prompt_no_llega_a_la_calle,
     ]
     fallos = 0
     for prueba in pruebas:

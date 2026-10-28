@@ -86,6 +86,22 @@ def _minus(texto: str) -> str:
     return normalizar(texto).lower()
 
 
+def _sin_nombre(titulo: str) -> bool:
+    return normalizar(titulo).lower() in ("unknown", "none", "nan", "")
+
+
+def canciones_reales(candidatos: Sequence[dict]) -> list[dict]:
+    """Las únicas canciones que el agente puede citar: las que tienen nombre real.
+
+    El catálogo trae filas cuyo título se quedó en "Unknown" y `formatear_canciones`
+    ya las ignora, pero `validar_respuesta` las contaba como válidas: el resultado
+    era una recomendación sin Spotify/YouTube y una frase de cierre que citaba
+    `"unknown" — Artista` copiada del prompt.
+    """
+    reales = [c for c in candidatos if not _sin_nombre(c.get("track_name"))]
+    return reales or list(candidatos)[:1]
+
+
 def formatear_canciones(candidatos: Sequence[dict], limite: int = 3) -> str:
     """'«A» de X, «B» de Y y «C» de Z' solo con canciones que tengan nombre real."""
     piezas = []
@@ -352,9 +368,28 @@ def recortar_frases(texto: str, maximo: int = 5) -> str:
     return " ".join(frases[:maximo]).strip()
 
 
+# Eco SIN viñeta: el modelo copia la línea del prompt pero sin el guion inicial, y a
+# veces con comillas rectas en vez de «». Vista en producción: la voz dijo
+#   "Add Some Music to Your Day" — The Beach Boys [Pop] "i love you" — Sarah Mclachlan [Pop]
+# mientras las tarjetas mostraban las mismas tres canciones en otro orden. Se quita
+# la pareja citada entera (título, guion largo y artista) porque las tarjetas ya la
+# llevan bien formada, con enlace a Spotify. Solo vale para las comillas rectas:
+# las «angulares» son el formato que el propio prompt pide, borrarlas castigaría
+# una respuesta correcta.
+_RE_ECO_GUION = re.compile(
+    r"[\"“”'][^\"“”']{2,80}[\"“”']\s*[—–]\s*"
+    r"[^\"“”'—–.!?…\n]{1,60}?"
+    r"(?=\s*(?:[\"“”']|\[[^\]]{1,40}\]|[.!?…]|$))"
+)
+# El corchete de género es notación interna del prompt; nunca debe verse.
+_RE_CORCHETE_GENERO = re.compile(r"\s*\[[^\]]{1,40}\]")
+
+
 def limpiar_ecos_de_lista(texto: str) -> str:
     """Quita las líneas de la lista interna que el modelo copia literalmente."""
     limpio = _RE_ECO_LISTA.sub(" ", texto or "")
+    limpio = _RE_ECO_GUION.sub(" ", limpio)
+    limpio = _RE_CORCHETE_GENERO.sub("", limpio)
     return normalizar(limpio)
 
 
