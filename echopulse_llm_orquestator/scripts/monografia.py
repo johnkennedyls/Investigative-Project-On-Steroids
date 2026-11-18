@@ -1270,6 +1270,10 @@ def cap6(doc, d):
         ("Corregir el corte visible. ",
          "Subir el número de destacadas o intercalar un emergente por tanda, y volver a medir "
          "la mezcla visible con el mismo protocolo de §5.5."),
+        ("Avisar cuando el catálogo no alcanza. ",
+         f"En {mil((r.get('saltos') or {}).get('catalogo_no_alcanza'))} turnos el género pedido no "
+         "tenía material suficiente y el juicio los omitió; el agente debería decírselo al oyente "
+         "en lugar de entregar lo más cercano en silencio."),
         ("Recolectar etiquetas de oyentes. ",
          "El gesto de gusto por tarjeta ya existe en la API; con veinte a treinta participantes "
          "reales las métricas de orden pueden contrastarse contra relevancia humana."),

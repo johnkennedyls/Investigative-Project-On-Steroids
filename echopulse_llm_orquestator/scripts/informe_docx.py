@@ -998,8 +998,9 @@ def arreglos(doc, c):
              f"{nm(c['bandas_ins'].get('emergentes_pct'))} % emergentes en puestos 4-10; popularity media "
              f"{nm(c['global']['tarjetas']['popularity_prom'],1)}."],
             ["Se prometían géneros que el catálogo no tiene",
-             "Castigo por desvío de género ×(1−0,50) y por desvío de ánimo ×(1−0,60), más honestidad "
-             "en la respuesta cuando el género no existe.",
+             "Castigo por desvío de género ×(1−0,50) y por desvío de ánimo ×(1−0,60), con etiquetas "
+             "canónicas de género por fila. El aviso explícito al oyente cuando el género pedido no "
+             "existe en el catálogo queda pendiente.",
              f"cumple_genero {nm(c['global']['tarjetas']['cumple_genero_pct'])} % donde hay flag; desvío de "
              f"ánimo medio {nm(c['global']['tarjetas']['desvio_animo_prom'],3)}."],
         ]),
