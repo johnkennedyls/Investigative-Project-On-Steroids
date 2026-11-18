@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EchoPulse AI — Arquitectura a detalle de todo lo desarrollado</title>
+<style>
+:root{
+  --bg:#080E1A; --panel:#0C1524; --card:#141F33; --border:#24334D;
+  --text:#E6EDF7; --muted:#93A4BE; --primary:#3B82F6; --secondary:#22D3EE;
+  --warn:#F59E0B; --ok:#34D399; --bad:#F87171;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 "Segoe UI",system-ui,-apple-system,sans-serif;
+}
+a{color:var(--secondary);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd{font-family:"Cascadia Mono",Consolas,monospace;font-size:.88em}
+code{background:#0A1220;border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:#CFE0F5}
+pre{background:#0A1220;border:1px solid var(--border);border-radius:10px;padding:16px 18px;overflow:auto;font-size:13px;line-height:1.5}
+pre code{background:none;border:none;padding:0;color:#D7E6FA}
+header.hero{padding:56px 32px 40px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#0B1322 0%,var(--bg) 100%)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.kicker{color:var(--primary);font-weight:700;letter-spacing:.16em;font-size:12px;text-transform:uppercase}
+h1{font-size:44px;line-height:1.12;margin:10px 0 6px;letter-spacing:-.5px}
+h2{font-size:30px;margin:0 0 4px;letter-spacing:-.3px}
+h3{font-size:20px;margin:30px 0 8px;color:var(--text)}
+h4{font-size:15px;margin:20px 0 6px;color:var(--secondary);text-transform:uppercase;letter-spacing:.08em}
+p,li{color:#C8D6E8}
+.lead{font-size:18px;color:var(--muted);max-width:900px}
+section{padding:46px 0 8px;border-bottom:1px solid var(--border);overflow-x:auto}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.sec-num{font-size:13px;font-weight:700;color:var(--primary);letter-spacing:.1em}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.card.accent{background:var(--card)}
+.card h3{margin:0 0 8px;font-size:18px}
+.card p{margin:6px 0;font-size:14.5px;color:var(--muted)}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:30px;color:var(--secondary);font-weight:800;letter-spacing:-.5px}
+.stat span{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{border:1px solid var(--border);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);color:var(--text);font-size:12.5px;text-transform:uppercase;letter-spacing:.06em}
+td{color:#C8D6E8}
+td code{white-space:nowrap}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;border:1px solid var(--border);color:var(--secondary);background:#0E1B2E}
+.tag.offline{color:var(--primary)}
+.tag.online{color:var(--ok)}
+.tag.risk{color:var(--bad)}
+.callout{border-left:3px solid var(--secondary);background:var(--card);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0}
+.callout.warn{border-left-color:var(--warn)}
+.callout.risk{border-left-color:var(--bad)}
+.callout h4{margin:0 0 6px;color:var(--text);text-transform:none;letter-spacing:0;font-size:15px}
+.callout p{margin:4px 0;font-size:14.5px}
+nav.toc{position:sticky;top:0;z-index:20;background:#0A1220ee;backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);padding:10px 0}
+nav.toc .wrap{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+nav.toc a{color:var(--muted)}
+nav.toc a:hover{color:var(--secondary)}
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:16px 0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 18px 52px;border-left:1px dashed var(--border);margin-left:18px}
+ol.steps li::before{content:counter(s);position:absolute;left:-18px;top:0;width:34px;height:34px;border-radius:50%;
+  background:var(--card);border:1px solid var(--border);color:var(--secondary);font-weight:800;display:grid;place-items:center;font-size:14px}
+ol.steps li b{color:var(--text)}
+ol.steps li p{margin:4px 0 0;font-size:14.5px;color:var(--muted)}
+ol.steps li code{font-size:12.5px}
+.flow{display:flex;gap:10px;overflow-x:auto;min-width:0;padding:6px 0 14px}
+.flow .node{min-width:158px;flex:1 0 158px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+.flow .node b{display:block;font-size:13.5px;color:var(--text)}
+.flow .node span{font-size:12px;color:var(--muted)}
+.flow .arrow{align-self:center;color:var(--primary);font-size:20px;font-weight:800}
+.lanes{display:grid;gap:16px;grid-template-columns:1fr}
+.lane{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--panel)}
+.lane h4{margin-top:0}
+ul.tight{margin:8px 0 0;padding-left:20px}
+ul.tight li{margin:5px 0;font-size:14.5px;color:#C8D6E8}
+.mono{font-family:"Cascadia Mono",Consolas,monospace;font-size:12.5px;color:var(--muted)}
+footer{padding:34px 0 60px;color:var(--muted);font-size:13px}
+.hr{height:1px;background:var(--border);margin:22px 0}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
+.small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Documento técnico · Tesis 2026-1 · Universidad FUP</div>
+    <h1>EchoPulse AI — arquitectura a detalle</h1>
+    <p class="lead">Todo lo que se desarrolló, explicado capa por capa: las cuatro fuentes de datos y sus dos
+    destinos, la Tabla Maestra, los dos transformers, el retrieval híbrido, el re-ranking con su cobertura real,
+    la orquestación con LLM local, el despliegue gratuito en Azure y las dos mitades de la evaluación
+    (offline del paper y online de la demo). Cada afirmación está enlazada al archivo y la línea del repositorio.</p>
+    <div class="pill-row">
+      <span class="tag offline">Offline: datasets y entrenamiento</span>
+      <span class="tag online">Online: consulta y respuesta</span>
+      <span class="tag">CPU · sin costo</span>
+      <span class="tag">Español</span>
+    </div>
+    <p class="small">Autor: John Kennedy Landazuri Sandoval · Continúa el artículo 22 presentado en 20CCC'26,
+    Cartagena de Indias. Fecha de este documento: 29 de octubre de 2026.</p>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#resumen">Resumen</a>
+  <a href="#mapa">Mapa general</a>
+  <a href="#fuentes">Las 4 fuentes</a>
+  <a href="#tabla">Tabla Maestra</a>
+  <a href="#modulo-a">Módulo A</a>
+  <a href="#modulo-2">Módulo 2 · retrieval</a>
+  <a href="#modulo-3">Módulo 3 · re-ranking</a>
+  <a href="#seleccion">Selección y diversidad</a>
+  <a href="#consulta">Consulta paso a paso</a>
+  <a href="#orquestacion">Orquestación</a>
+  <a href="#api">API y frontend</a>
+  <a href="#despliegue">Despliegue</a>
+  <a href="#evaluacion">Evaluación</a>
+  <a href="#decisiones">Decisiones</a>
+  <a href="#limitaciones">Limitaciones</a>
+  <a href="#archivos">Mapa de archivos</a>
+  <a href="#glosario">Glosario</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="resumen">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Resumen ejecutivo</h2></div>
+  <p>EchoPulse AI es un recomendador conversacional <b>basado en contenido</b>: no necesita historial de escucha
+  porque entiende la canción por lo que es (letra, rasgos técnicos, metadata cultural) y entiende al usuario por
+  lo que dice en español. La respuesta nunca la inventa el modelo de lenguaje: la construyen dos transformers
+  entrenados por separado y el LLM solo la envuelve en prosa, bajo un validador que le veta cualquier canción
+  que no esté en la tanda.</p>
+
+  <div class="grid g4" style="margin-top:18px">
+    <div class="stat"><b>4</b><span>fuentes de datos, con dos destinos distintos</span></div>
+    <div class="stat"><b>5.710</b><span>pistas en el pool de retrieval</span></div>
+    <div class="stat"><b>512 d</b><span>vector por canción (Módulo 2)</span></div>
+    <div class="stat"><b>38.343</b><span>clases de canción (Módulo 3)</span></div>
+    <div class="stat"><b>0,70 / 0,30</b><span>similitud / intención en la fusión</span></div>
+    <div class="stat"><b>10,2 %</b><span>cobertura del Módulo 3 sobre el pool</span></div>
+    <div class="stat"><b>250 ms</b><span>retrieval + re-ranking (offline)</span></div>
+    <div class="stat"><b>9,3 s</b><span>mediana de un turno en la demo</span></div>
+  </div>
+
+  <h3>Las cuatro ideas que sostienen el proyecto</h3>
+  <div class="grid g2">
+    <div class="card"><h3>Dos transformers, dos preguntas</h3>
+      <p><code>MST_MR_Transformer</code> responde <em>qué es esta canción</em> y entrega un vector de 512 dimensiones.
+      <code>IntentTransformer</code> responde <em>qué está pidiendo este oyente</em> y puntúa sobre 38.343 canciones.
+      No comparten arquitectura, ni dimensiones, ni datos de entrenamiento.</p></div>
+    <div class="card"><h3>Tres fuentes construyen el catálogo</h3>
+      <p>WASABI, Lyrics 1950-2019 y Million Song Dataset se casan en la Tabla Maestra. TalkPlayData-2
+      <b>no entra al catálogo</b>: es la conversación sintética con la que se entrena la intención.</p></div>
+    <div class="card"><h3>El LLM no decide, redacta</h3>
+      <p>El orquestador le inyecta únicamente las canciones ya seleccionadas y rechaza la respuesta si cita algo
+      que no estaba ahí, si numera listas internas del prompt o si deja títulos vacíos.</p></div>
+    <div class="card"><h3>Desplegado y medido, no simulado</h3>
+      <p>Corre en una VM estudiantil de Azure con Docker Compose y Qwen 2.5-1.5B en CPU, público por túnel HTTPS,
+      y cada turno queda en JSONL para producir métricas propias.</p></div>
+  </div>
+</section>
+
+<section id="mapa">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Mapa general del sistema</h2></div>
+  <p>El sistema tiene dos tiempos que no se mezclan. El <b>offline</b> construye los artefactos (tabla, vocabularios,
+  pesos, embeddings). El <b>online</b> los carga una sola vez al arrancar el servicio y responde turnos.</p>
+
+  <div class="lanes">
+    <div class="lane">
+      <h4><span class="tag offline">Offline</span> &nbsp; de los CSV crudos a los pesos</h4>
+      <div class="flow">
+        <div class="node"><b>Fuentes</b><span>WASABI · Lyrics 1950-2019 · MSD · TalkPlay2</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>ETL</b><span>limpieza, MICE, MAD, alineación de IDs</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Tabla Maestra</b><span>5.710 pistas × 26 rasgos + letra</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Entrenamiento</b><span>M2 (tabla) y M3 (diálogos)</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Artefactos</b><span>.pth · vocab · song_map · embeddings.pt</span></div>
+      </div>
+    </div>
+    <div class="lane">
+      <h4><span class="tag online">Online</span> &nbsp; de un mensaje en español a una tarjeta con enlace</h4>
+      <div class="flow">
+        <div class="node"><b>Turno</b><span><code>clasificar_mensaje</code></span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Intención</b><span>heurística ES → keywords EN, LLM opcional</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Retrieval k=30</b><span>coseno + Jaccard + perfil</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Selección 10</b><span>enriquecer, diversidad, cupos</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Re-ranking</b><span>fusión 0,70 · 0,30 + cobertura</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Qwen + validador</b><span>3 destacadas, tarjetas, JSONL</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h4>Por qué la separación importa para la tesis</h4>
+    <p>El camino lento es solo el último bloque. Recuperar y re-ranquear sobre 5.710 pistas toma menos de 250 ms;
+    el turno completo mediano en la demo es 9,3 s (p90 13,1 s) porque el LLM en CPU domina la latencia. Cualquier
+    optimización del sistema que no toque el LLM no se nota en el usuario.</p>
+  </div>
+
+  <h3>Coste por fase (medido, no estimado)</h3>
+  <table>
+    <thead><tr><th>Fase</th><th>Qué hace</th><th>Cuesta</th><th>Evidencia</th></tr></thead>
+    <tbody>
+      <tr><td>Intención</td><td>Clasificar el turno y extraer keywords en inglés</td><td>~0 ms si la heurística alcanza; una llamada al LLM si no</td><td><code>app.py:994-1031</code></td></tr>
+      <tr><td>Retrieval</td><td>Coseno + Jaccard + perfil sobre 5.710 filas</td><td>&lt;250 ms (conjunto con re-ranking)</td><td><code>app.py:653-767</code>, paper 20CCC'26</td></tr>
+      <tr><td>Selección</td><td>Enriquecer, filtrar repetidas, aplicar cupos</td><td>lineal en el pool (30)</td><td><code>app.py:1063-1072</code></td></tr>
+      <tr><td>Re-ranking</td><td>Softmax del M3 y fusión</td><td>una pasada del transformer</td><td><code>app.py:860-879</code>, <code>rerank.py:27</code></td></tr>
+      <tr><td>Redacción</td><td>Qwen 2.5-1.5B en CPU + validador (con reintentos)</td><td>el resto: mediana 9,3 s del turno</td><td><code>evaluar_metricas.py:194-195</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="fuentes">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Las cuatro fuentes de datos y sus dos destinos</h2></div>
+  <p>Este es el punto que más se confunde al explicar el sistema, y es estructural: <b>tres fuentes construyen el
+  catálogo y la cuarta enseña a pedir</b>. TalkPlayData-2 no alimenta la Tabla Maestra; alimenta el Módulo 3.</p>
+
+  <table>
+    <thead><tr><th>Fuente</th><th>Qué trae</th><th>ETL</th><th>Adónde va</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>WASABI Songs</b></td>
+        <td>Rasgos culturales y afectivos sin filtros: bpm, valence, arousal, gain, tópicos de letra, emociones,
+        <code>album_genre</code> y el flag <code>isClassic</code>.</td>
+        <td><code>docs/ETLWasabiSongs.ipynb</code></td>
+        <td><span class="tag offline">Tabla Maestra</span> aporta <code>genre_was</code> (<code>app.py:598</code>)
+        e <code>is_classic</code> (<code>app.py:585-588</code>).</td>
+      </tr>
+      <tr>
+        <td><b>Lyrics 1950-2019</b></td>
+        <td>Setenta años de letras con título y artista (base <code>tcc_ceds_music.csv</code>) más rasgos del texto
+        (<code>energy</code>, <code>valence</code>, <code>sadness</code>, <code>romantic</code>). Es la fuente lírica
+        y con ella se entrena el tokenizador.</td>
+        <td><code>docs/etlLyrics1950-2019.ipynb</code> — atípicos por percentiles 1/99 y corte temporal 10/10/80.</td>
+        <td><span class="tag offline">Tabla Maestra</span> columna <code>lyrics_cleaned</code>
+        (<code>app.py:519</code>) y los rasgos <code>_lyr</code> que lee <code>perfiles.py</code>.</td>
+      </tr>
+      <tr>
+        <td><b>Million Song Dataset</b><br><span class="small">tracks.csv (~590k tracks)</span></td>
+        <td>26 rasgos técnicos de audio normalizados y metadata de Spotify (popularidad, título, artista).</td>
+        <td><code>docs/etlSongs.ipynb</code>; consolidación de popularidad en
+        <code>scripts/build_fame_index.py</code> y <code>scripts/cross_tracks_csv.py</code>.</td>
+        <td><span class="tag offline">Tabla Maestra</span> para los rasgos técnicos y
+        <span class="tag online">señal de fama</span> en tiempo de consulta vía
+        <code>models/fame_index.parquet</code> (<code>app.py:555-574</code>) y
+        <code>models/song_metadata.json</code>.</td>
+      </tr>
+      <tr>
+        <td><b>TalkPlayData-2</b><br><span class="small">~16.000 diálogos</span></td>
+        <td>Conversaciones de recomendación de música: turno de usuario, turno de sistema y la canción de
+        referencia de cada ronda.</td>
+        <td><code>docs/etlTalkPlay.ipynb</code> — explosión de turnos y división <b>80/10/10 por
+        <code>session_id</code></b> (una sesión jamás se parte en dos mitades).</td>
+        <td><span class="tag risk">NO entra a la Tabla Maestra</span>. Entrena
+        <code>IntentTransformer</code> en <code>docs/TalkplayTransformer_Intentional.ipynb</code> y produce
+        <code>models/talkplay/{vocab.json, song_map.pkl, intent_model.pth}</code> (<code>app.py:845-852</code>).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <h4>Consecuencia directa de esta separación: la cobertura del 10,2 %</h4>
+    <p>Como el Módulo 3 aprendió de un universo de canciones distinto al catálogo servible, sus 38.343 clases solo
+    alcanzan como clase reconocida a una de cada diez candidatas que trae el retrieval. No es un umbral de afinidad
+    ni un error de código: es el hueco entre dos conjuntos de datos. Está documentado en
+    <a href="#modulo-3">Módulo 3</a> y se mide en cada tanda.</p>
+  </div>
+
+  <h3>Artefactos que deja el trabajo offline</h3>
+  <table>
+    <thead><tr><th>Artefacto</th><th>Contenido</th><th>Lo consume</th></tr></thead>
+    <tbody>
+      <tr><td><code>tabla_maestra/train/*.parquet</code></td><td>5.710 pistas etiquetadas + 683 de prueba</td><td>Módulo 2 (<code>app.py:479</code>, ruta por <code>TABLA_MAESTRA_DIR</code>)</td></tr>
+      <tr><td><code>models/tabla_maestra/mst_mr_final.pth</code></td><td>Pesos del MST_MR + <code>vocab</code> + <code>scaler</code></td><td>Módulo 2 (<code>app.py:497-501</code>)</td></tr>
+      <tr><td><code>models/tabla_maestra/embeddings.pt</code></td><td>Tensor <code>[5710, 512]</code> pre-computado</td><td>Retrieval; sin él se encienden embeddings aleatorios y el índice deja de ser fiable</td></tr>
+      <tr><td><code>models/talkplay/intent_model.pth</code></td><td>Pesos del IntentTransformer</td><td>Módulo 3</td></tr>
+      <tr><td><code>models/talkplay/song_map.pkl</code></td><td>canción ↔ índice de clase (38.343)</td><td>Módulo 3 y el cálculo de cobertura</td></tr>
+      <tr><td><code>models/fame_index.parquet</code></td><td>Popularidad por canción y máxima por artista</td><td>Detección de emergentes (<code>app.py:555-574</code>)</td></tr>
+      <tr><td><code>models/song_metadata.json</code></td><td>38.343 claves con título, artista y enlaces</td><td><code>enriquecer_candidato</code> (<code>app.py:384</code>)</td></tr>
+      <tr><td><code>models/module3_ids.json</code></td><td>Subconjunto de IDs servibles por el M3</td><td>Diagnóstico de cobertura</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="tabla">
+  <div class="sec-head"><span class="sec-num">04</span><h2>La Tabla Maestra: el trabajo de datos</h2></div>
+  <p>Tres fuentes decían la misma canción de tres maneras distintas —con IDs de MSD, con identificadores de WASABI,
+  con el texto libre de la fuente lírica— y con nombres que no coinciden letra por letra. Casarlas fue la mitad del
+  proyecto. La tabla resultante es <b>una fila por canción</b> con letra, rasgos técnicos y contexto cultural.</p>
+
+  <div class="grid g4">
+    <div class="stat"><b>5.710</b><span>pistas en el pool servible (entrenamiento)</span></div>
+    <div class="stat"><b>683</b><span>pistas de test en corte temporal</span></div>
+    <div class="stat"><b>26</b><span>rasgos técnicos por fila</span></div>
+    <div class="stat"><b>84 %</b><span>de cobertura en el mapeo de identificadores</span></div>
+  </div>
+
+  <h3>Cadena de alineación (de más barata a más relajada)</h3>
+  <ol class="steps">
+    <li><b>Identificador estándar.</b> Si dos fuentes comparten ID de MSD, es la misma canción. Sin discusión.</li>
+    <li><b>Texto normalizado.</b> Artista y título pasan por minúsculas, sin acentos ni puntuación; el join se hace
+    sobre la clave normalizada (<code>_norm_join_key</code>, y en línea
+    <code>app.py:548-552</code> para el índice de popularidad).</li>
+    <li><b>Mapeo óptimo húngaro + Levenshtein δ≤2.</b> Cuando un mismo bloque de candidatos compite por varias
+    filas, se resuelve con asignación óptima en vez de primero-que-gana; la distancia de edición hasta 2 acepta
+    erratas de catálogo. Cobertura reportada en el paper: 84 %.</li>
+    <li><b>Fuzzy &gt;95 %.</b> Último recurso para títulos con diferencias de puntuación o subtítulo. Lo que no pasa
+    el filtro <b>no entra al corpus</b>: se prefiere catálogo chico y correcto.</li>
+  </ol>
+
+  <h3>Limpieza y robustez numérica</h3>
+  <table>
+    <thead><tr><th>Técnica</th><th>Para qué</th><th>Dónde se ve</th></tr></thead>
+    <tbody>
+      <tr><td><b>MICE</b></td><td>Imputación multivariada por ecuaciones condicionales: reconstruye los huecos de
+      las variables de ánimo sin borrar filas.</td><td><code>docs/ETLWasabiSongs.ipynb</code>,
+      <code>docs/etlLyrics1950-2019.ipynb</code></td></tr>
+      <tr><td><b>MAD con κ=3,5</b></td><td>Detección de atípicos robusta a la distribución asimétrica del audio
+      (la mediana absoluta desviada no se contamina con el propio atípico).</td><td>Mismo ETL; descrito en
+      <code>docs/EchoPulseAI architecture.md</code></td></tr>
+      <tr><td><b>Percentiles 1/99</b></td><td>Recorte de colas antes de escalar, para que un bpm absurdo no
+      arrastre el escalado de toda la columna.</td><td><code>docs/etlLyrics1950-2019.ipynb</code></td></tr>
+      <tr><td><b>Escalado por cuantiles</b></td><td>El <code>scaler</code> guardado en el checkpoint convierte los
+      26 rasgos crudos en señales comparables; en línea se reaplica el mismo objeto, nunca uno nuevo
+      (<code>app.py:493</code>).</td><td><code>app.py:497-501</code></td></tr>
+      <tr><td><b>División temporal 80/10/10</b></td><td>Entrenar con música posterior para predecir preferencias
+      anteriores infla cualquier Hit@10. El corte va por año.</td><td>ETL y paper</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <h4>Dato abierto que conviene declarar en defensa</h4>
+    <p>La suma de los parquet locales da <b>7.054 filas</b>, mientras que el pool servible y el archivo de embeddings
+    tienen <b>5.710</b> (más 683 de test). La diferencia son filas que quedaron fuera del corte temporal o sin
+    etiqueta usable; vale la pena escribirla como nota metodológica en vez de promediarla en silencio.</p>
+  </div>
+
+  <h3>Anatomía de una fila</h3>
+  <table>
+    <thead><tr><th>Bloque</th><th>Columnas típicas</th><th>Quién la consume</th></tr></thead>
+    <tbody>
+      <tr><td>Identidad</td><td><code>id</code> / <code>msd_id</code>, <code>artist_name</code>,
+      <code>track_name</code>, año</td><td>Exclusión de sesión, diversidad, join de fama (<code>app.py:533-539</code>)</td></tr>
+      <tr><td>Letra</td><td><code>lyrics_cleaned</code> → tokens ≤151</td><td>Embedding lírico del M2 y
+      <code>lyric_word_sets</code> para Jaccard (<code>app.py:531</code>)</td></tr>
+      <tr><td>Técnica</td><td>26 rasgos de audio normalizados</td><td><code>tech_projection</code> 26→256→512</td></tr>
+      <tr><td>Cultural</td><td><code>genre_was</code>, <code>album_genre</code>, <code>genre_lyr</code>,
+      <code>isClassic</code></td><td>Perfil de búsqueda (<code>app.py:598</code>) y etiqueta de clásico</td></tr>
+      <tr><td>Ánimo</td><td>Rasgos <code>_lyr</code> con sus cuantiles</td><td><code>perfiles.perfil_vector</code>
+      y el filtro multiplicativo de ánimo</td></tr>
+      <tr><td>Generado</td><td>Vector de 512 d en <code>embeddings.pt</code></td><td>Coseno del retrieval</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="modulo-a">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Módulo A: los dos transformers entrenados</h2></div>
+  <p>Aquí vive la novedad arquitectónica del paper: un transformer que fusiona letra y técnica por
+  <b>cross-attention</b>, y otro que aprende a leer pedidos. Se entrenaron con datos distintos y tienen formas
+  distintas; confundirlos es el error más común al explicar el sistema.</p>
+
+  <h3><span class="tag offline">Módulo 2</span> &nbsp; <code>MST_MR_Transformer</code> — qué es la canción</h3>
+  <p class="mono">Definición exacta: <code>echopulse_llm_orquestator/app.py:459-476</code></p>
+  <table>
+    <thead><tr><th>Capa</th><th>Configuración real</th><th>Forma del tensor</th></tr></thead>
+    <tbody>
+      <tr><td><code>lyric_emb</code></td><td><code>nn.Embedding(vocab_size, 512, padding_idx=0)</code></td>
+      <td><code>[B, 151, 512]</code></td></tr>
+      <tr><td><code>pos_encoding</code></td><td>Parámetro aprendible, no senos fijos</td><td><code>[1, 151, 512]</code></td></tr>
+      <tr><td><code>tech_projection</code></td><td><code>Linear(26,256) → GELU → Linear(256,512)</code></td><td><code>[B, 512]</code></td></tr>
+      <tr><td><code>cross_attn</code></td><td><code>MultiheadAttention(512, 8 cabezas, batch_first)</code> —
+      <b>query</b> = letra, <b>key/value</b> = técnica proyectada</td><td><code>[B, 151, 512]</code></td></tr>
+      <tr><td><code>norm_fusion</code></td><td><code>LayerNorm(attn_out + x_lyric)</code> (residual)</td><td><code>[B, 151, 512]</code></td></tr>
+      <tr><td><code>decoder</code></td><td><code>TransformerDecoder</code> de <b>6 capas</b>, 8 cabezas;
+      memoria = la fusión anterior</td><td><code>[B, 151, 512]</code></td></tr>
+      <tr><td>Salida</td><td><code>fc_out(mean(decoder, dim=1))</code></td><td><code>[B, 512]</code></td></tr>
+    </tbody>
+  </table>
+<pre><code># app.py:459 — fusión por cross-attention (letra consulta, técnica responde)
+x_lyric = self.lyric_emb(lyrics_idx) + self.pos_encoding[:, :lyrics_idx.size(1), :]
+x_tech  = self.tech_projection(tech_features).unsqueeze(1)
+attn_out, _ = self.cross_attn(x_lyric, x_tech, x_tech)
+memory = self.norm_fusion(attn_out + x_lyric)      # residual + LayerNorm
+dec_out = self.decoder(x_lyric, memory)
+return self.fc_out(torch.mean(dec_out, dim=1))     # [B, 512]</code></pre>
+  <div class="callout">
+    <h4>Por qué cross-attention y no concatenar</h4>
+    <p>Concatenar letra y técnica obliga al decoder a descubrir solo qué posición de la letra debe atender a qué
+    rasgo. Con cross-attention la letra <em>pregunta</em> y el vector técnico <em>responde</em> en cada posición.
+    El estudio de ablación del paper le atribuye <b>+14,1 % de nDCG@10</b> respecto de la variante sin fusión.</p>
+  </div>
+
+  <h3><span class="tag offline">Módulo 3</span> &nbsp; <code>IntentTransformer</code> — qué se está pidiendo</h3>
+  <p class="mono">Definición exacta: <code>echopulse_llm_orquestator/app.py:821-832</code></p>
+  <table>
+    <thead><tr><th>Capa</th><th>Configuración real</th><th>Forma del tensor</th></tr></thead>
+    <tbody>
+      <tr><td><code>embed</code></td><td><code>nn.Embedding(vocab_talkplay, 256, padding_idx=0)</code></td><td><code>[B, 512, 256]</code></td></tr>
+      <tr><td><code>pos</code></td><td>Parámetro aprendible hasta 512 posiciones</td><td><code>[1, 512, 256]</code></td></tr>
+      <tr><td><code>encoder</code></td><td><code>TransformerEncoderLayer</code> × <b>4 capas</b>, 8 cabezas,
+      <code>dim_feedforward=1024</code></td><td><code>[B, 512, 256]</code></td></tr>
+      <tr><td>Pooling</td><td>Media sobre las posiciones</td><td><code>[B, 256]</code></td></tr>
+      <tr><td><code>fc</code></td><td><code>Linear(256, num_songs)</code> con <code>num_songs = len(song2idx)</code></td>
+      <td><code>[B, 38.343]</code></td></tr>
+    </tbody>
+  </table>
+  <p>La salida es una <b>clasificación multinomial</b> sobre canciones, no un vector: se aplica softmax y se toma
+  la probabilidad de cada candidata (<code>app.py:870-878</code>). Por eso el Módulo 3 no puede recomendar una
+  canción que no sea una de sus clases; solo puede puntuar las que ya trajo el Módulo 2.</p>
+
+  <h3>Cómo se tokeniza cada uno</h3>
+  <table>
+    <thead><tr><th></th><th>Módulo 2</th><th>Módulo 3</th></tr></thead>
+    <tbody>
+      <tr><td>Vocabulario</td><td>Entrenado sobre <code>lyrics_cleaned</code> de la Tabla Maestra; vive en el
+      checkpoint</td><td><code>models/talkplay/vocab.json</code>, nacido de los diálogos</td></tr>
+      <tr><td>Longitud</td><td>151 posiciones</td><td>512 posiciones</td></tr>
+      <tr><td>Entrada en línea</td><td>La consulta traducida a keywords + un <b>vector técnico neutro</b>
+      (<code>tech_neutral_vector</code>)</td><td>La misma cadena de keywords en inglés</td></tr>
+      <tr><td>Desconocidos</td><td>Sub-strings de respaldo antes de tirar todo a <code>&lt;UNK&gt;</code>
+      (<code>app.py:629-634</code>)</td><td><code>&lt;UNK&gt;</code> con relleno a ceros</td></tr>
+    </tbody>
+  </table>
+  <p class="small">Detalle no obvio: en el retrieval la consulta es texto corto, no una letra de 150 tokens, así que
+  se le acompaña del vector técnico <em>neutro</em>. La cross-attention sigue activa y la consulta queda anclada en
+  el promedio del catálogo, que es exactamente lo que se quiere cuando el usuario no nombró tempo ni tonalidad.</p>
+</section>
+
+<section id="modulo-2">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Módulo 2 · retrieval híbrido sobre la Tabla Maestra</h2></div>
+  <p class="mono"><code>Module2MasterTable.retrieve_top10</code> — <code>app.py:653-816</code></p>
+  <p>El retrieval decide <b>qué candidatos existen</b>. Si aquí se pierde una canción, ningún re-ranking posterior
+  la recupera. Por eso mezcla tres señales y dos castigos multiplicativos.</p>
+
+  <ol class="steps">
+    <li><b>Tokenizar la consulta y preparar el anclaje técnico.</b> <code>tokens = self.tokenize(user_query_en)</code>
+    y un vector técnico neutro (<code>app.py:670-671</code>).</li>
+    <li><b>Similitud neuronal.</b> La consulta se proyecta con el MST_MR, se normaliza y se compara por coseno contra
+    los 5.710 vectores ya calculados (<code>app.py:676-677</code>). Aporta afinidad semántica por ánimo, tema y época.</li>
+    <li><b>Similitud léxica.</b> Jaccard entre las palabras de la consulta y las palabras de la letra de cada fila
+    (<code>app.py:679-683</code>). Es la que garantiza que «jazz» devuelva jazz aunque el vector diga otra cosa.</li>
+    <li><b>Perfil de búsqueda.</b> <code>perfiles.perfil_consulta</code> extrae géneros y ánimo pedido
+    (<code>perfiles.py:109</code>), <code>heredar_perfil</code> puede tomarlo del turno anterior
+    (<code>perfiles.py:138</code>) y <code>perfil_vector</code> lo convierte en señal por fila
+    (<code>perfiles.py:188</code>).</li>
+    <li><b>Mezcla con pesos renormalizados.</b> Cada componente se lleva a [0,1] <em>dentro del pool</em> y se pesa.
+    Sin perfil: <code>neural 0,40 / léxico 0,60</code>. Con perfil: <code>neural 0,30 / léxico 0,35 / perfil 0,35</code>
+    (<code>app.py:708-716</code>). Un componente sin discriminación se retira y su peso se reparte entre los activos
+    (<code>app.py:719-721</code>).</li>
+    <li><b>Castigos multiplicativos de ánimo y género.</b> <code>score *= (1 − fuerza · desvío)</code> con
+    <code>ANIMO_FILTRO = 0,60</code> y <code>GENERO_FILTRO = 0,50</code> (<code>app.py:295-298, 730-747</code>).
+    No son una señal más: son un guardabarros, porque con peso 0,35 «tranquilo» todavía devolvía rock.</li>
+    <li><b>Exclusión de sesión antes del top-k.</b> A las canciones ya recomendadas se les pone
+    <code>-inf</code> (<code>app.py:758-764</code>), así el «dame más» devuelve k nuevas en vez de k menos
+    las repetidas.</li>
+    <li><b>Salida con etiqueta de fama.</b> Cada candidato sale con título, artista, enlace, perfil de género y el
+    booleano <code>emergente</code> (<code>app.py:777-813</code>). Todo el diagnóstico de señales se guarda en
+    <code>diag</code> (<code>app.py:748-756</code>).</li>
+  </ol>
+
+  <h3>Qué se pide y qué NO se filtra</h3>
+  <table>
+    <thead><tr><th>Se aplica</th><th>No se aplica</th></tr></thead>
+    <tbody>
+      <tr><td>Ánimo pedido → castigo ×0,60</td><td>Filtro duro de año (la época entra como rasgo, no como veto)</td></tr>
+      <tr><td>Género pedido → castigo ×0,50</td><td>Filtro duro de artista (la diversidad se resuelve en la selección)</td></tr>
+      <tr><td>Exclusión de lo ya recomendado</td><td>Veto a emergentes: se les da cupo, no se les cierra la puerta</td></tr>
+      <tr><td>Herencia de perfil en «dame más»</td><td>Búsquedas externas: todo se resuelve dentro de la Tabla Maestra</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <h4>El motivo real de la mezcla ponderada</h4>
+    <p>El comentario en <code>app.py:685-690</code> lo dice con números: Jaccard crudo es <em>órdenes de magnitud</em>
+    más pequeño que la similitud neural porque las consultas son cortas. Sin normalizar por pool, el término léxico
+    sería decorativo y el sistema dejaría de cumplir géneros nombrados. El <code>_norm_01</code> existe para eso.</p>
+  </div>
+</section>
+
+<section id="modulo-3">
+  <div class="sec-head"><span class="sec-num">07</span><h2>Módulo 3 · re-ranking por intención y fusión</h2></div>
+  <p class="mono"><code>app.py:860-879</code> (torch) + <code>rerank.py:27-80</code> (fusión pura, testeable sin checkpoints)</p>
+  <p>La aritmética del modelo está separada de la aritmética de la fusión a propósito: la primera necesita
+  <code>intent_model.pth</code> y 38.343 clases en RAM; la segunda es una función pura que se puede probar con
+  dictados de prueba. Ese corte es lo que permite escribir un test de cobertura sin levantar el servicio.</p>
+
+  <h3>Reglas de fusión</h3>
+  <ol class="steps">
+    <li><b>Probabilidades solo para conocidas.</b> <code>probabilidades = {id: probs[song2idx[id]]}</code> únicamente
+    para las candidatas que son clase del modelo (<code>app.py:875-878</code>).</li>
+    <li><b>Normalización por el máximo del pool.</b> La mejor conocida queda en 1,0; las demás en proporción. Evita
+    que la escala absoluta del softmax —que es diminuta sobre 38.343 clases— opaque la similitud.</li>
+    <li><b>Neutro para desconocidas.</b> Las que no son clase reciben <b>la mediana</b> de las normalizadas
+    (<code>rerank.py:44-60</code>): ni premio ni castigo. Antes recibían <code>0.0</code>, lo que hundía una tanda
+    entera sin explicar por qué.</li>
+    <li><b>Score final.</b> <code>final = 0,70 · similitud + 0,30 · intención</code>
+    (<code>rerank.py:23-24</code>). La intención pesa menos porque su cobertura es parcial.</li>
+    <li><b>Diagnóstico obligatorio.</b> Se devuelven <code>cobertura_m3</code>, <code>intent_neutra</code>,
+    <code>candidatas_sin_clase_m3</code> y <code>m3_aporto_orden</code> (<code>rerank.py:73-79</code>) y se escriben
+    en el log de cada turno.</li>
+  </ol>
+
+  <table>
+    <thead><tr><th>Métrica de diagnóstico</th><th>Qué significa</th><th>Valor observado en la demo</th></tr></thead>
+    <tbody>
+      <tr><td><code>cobertura_m3</code></td><td>Facción del pool que existe como clase en el re-ranker</td><td>10,18 % promedio</td></tr>
+      <tr><td><code>candidatas_sin_clase_m3</code></td><td>Cuántas quedaron con intención neutra</td><td>~9 de cada 10</td></tr>
+      <tr><td><code>intent_neutra</code></td><td>Valor de la mediana usada como neutro</td><td>varía por tanda</td></tr>
+      <tr><td><code>m3_aporto_orden</code></td><td>Si hubo al menos una conocida con máximo &gt; 0</td><td>falso en tandas sin superposición</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout risk">
+    <h4>Cómo se explica esto en la defensa (y por qué no es un bug)</h4>
+    <p>El pool de retrieval sale de una tabla de <b>5.710</b> pistas; las clases del re-ranker son <b>38.343</b>
+    canciones del universo TalkPlay. La intersección es pequeña por construcción. La tesis no la esconde: la mide,
+    la registra por tanda y la declara como limitación con una ruta concreta (re-entrenar el M3 sobre el catálogo
+    servible). Ocultarla habría producido tandas ordenadas por la mitad del sistema sin que nadie pudiera saberlo.</p>
+  </div>
+</section>
+
+<section id="seleccion">
+  <div class="sec-head"><span class="sec-num">08</span><h2>Selección, diversidad y etiqueta de emergente</h2></div>
+  <p class="mono"><code>enriquecer_candidato</code> <code>app.py:384</code> · <code>seleccionar_candidatos</code> <code>app.py:884-935</code></p>
+  <table>
+    <thead><tr><th>Parámetro</th><th>Valor</th><th>Efecto</th><th>Línea</th></tr></thead>
+    <tbody>
+      <tr><td><code>k</code> del retrieval</td><td>30</td><td>Pool ancho para que la selección pueda filtrar sin
+      quedarse corta</td><td><code>app.py:1047</code></td></tr>
+      <tr><td><code>objetivo</code></td><td>10</td><td>Tamaño final de la tanda</td><td><code>app.py:1066</code></td></tr>
+      <tr><td><code>MAX_POR_ARTISTA</code></td><td>2</td><td>Ningún artista domina la tanda</td><td><code>app.py:899</code></td></tr>
+      <tr><td><code>MINIMO_RECONOCIDOS</code></td><td>configurable por env</td><td>Cupo de artistas conocidos para
+      que la tanda no sea 10 canciones imposibles de reconocer</td><td><code>app.py:888-896</code></td></tr>
+      <tr><td><code>DESTACADAS</code></td><td>3</td><td>Cuántas se nombran en voz; el resto queda en tarjetas</td>
+      <td><code>app.py:260</code></td></tr>
+      <tr><td><code>POP_RECONOCIDO</code></td><td>60</td><td>Umbral de popularidad Spotify para llamar a alguien
+      «reconocido»</td><td><code>app.py:293</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cómo se marca a un artista emergente</h3>
+  <p>Una canción es <b>reconocida</b> si tiene popularidad Spotify ≥ 60 <em>o</em> si <code>isClassic</code> de WASABI
+  es verdadero. Sin ninguna de las dos señales es <b>emergente</b> (<code>app.py:544-545, 777-813</code>). El índice
+  de fama se construyó desde <code>tracks.csv</code> con 545.983 filas, y se consultan dos niveles:
+  <code>pop_by_key</code> por (artista, título) y <code>pop_by_artista</code> con el máximo del artista, porque las
+  diferencias de título entre catálogos producían falsos negativos de fama.</p>
+
+  <div class="callout">
+    <h4>Orden exacto dentro del turno</h4>
+    <p><code>retrieve_top10</code> → <code>enriquecer_candidato</code> → filtrar repetidas → <code>seleccionar_candidatos</code>
+    → <code>rerank_candidates</code>. Enriquecer <em>antes</em> de seleccionar es deliberado
+    (<code>app.py:1059-1063</code>): hay filas de la tabla sin título que el caché de metadata sí puede nombrar. Si
+    se seleccionara primero, esas canciones saldrían como tarjetas «Canción recomendada» o quedarían fuera sin motivo.</p>
+  </div>
+</section>
+
+<section id="consulta">
+  <div class="sec-head"><span class="sec-num">09</span><h2>Una consulta del usuario, paso a paso</h2></div>
+  <p class="mono">Recorrido completo: <code>procesar_consulta_echopulse</code> <code>app.py:982-1200</code></p>
+  <p>Pedido real de los logs de la demo: <b>«algo tranquilo para estudiar de madrugada»</b>.</p>
+
+  <ol class="steps">
+    <li><b>Clasificación del turno.</b> <code>clasificar_mensaje</code> (<code>conversacion.py:126</code>) decide si
+    es <em>música</em>, <em>«dame más»</em>, <em>pregunta</em> o <em>perfil heredado</em>. En los logs hay 94 turnos de
+    música, 16 de continuación, 9 con perfil heredado y 1 pregunta.</li>
+    <li><b>Keywords heurísticas en español.</b> <code>keywords_heuristicas</code> (<code>app.py:431</code>) mapea
+    «tranquilo», «estudiar», «madrugada» a una cadena de búsqueda en inglés, y <code>detectar_tono</code>
+    (<code>conversacion.py:207</code>) extrae el ánimo. <b>El LLM solo entra si la heurística no alcanza</b>
+    (<code>app.py:999</code>), con <code>max_tokens=48</code> y <code>temperature=0,1</code>.</li>
+    <li><b>Validación de la salida del LLM.</b> <code>validar_keywords</code> (<code>app.py:441</code> →
+    <code>conversacion.py:659</code>) descarta inventos: si el texto no contiene términos que existan en el catálogo,
+    se tira y se vuelve a la heurística.</li>
+    <li><b>Herencia en continuaciones.</b> Si el turno es <code>mas_de_lo_mismo</code>, se pasa
+    <code>heredar=(géneros, ánimo)</code> del perfil guardado en la sesión (<code>app.py:1040-1044</code>). Sin esto,
+    «dame más de esa energía» se queda sin género y el cupo de emergentes devuelve jazz después de una tanda de rock.</li>
+    <li><b>Retrieval k=30</b> con mezcla neuronal/léxica/perfil y castigos de ánimo y género
+    (<a href="#modulo-2">sección 06</a>).</li>
+    <li><b>Enriquecer y seleccionar 10</b> con máximo 2 por artista y cupos de reconocidos/emergentes
+    (<a href="#seleccion">sección 08</a>).</li>
+    <li><b>Re-ranking del Módulo 3</b> y fusión 0,70 / 0,30; se anota la cobertura de la tanda
+    (<a href="#modulo-3">sección 07</a>).</li>
+    <li><b>Contexto para el LLM.</b> Solo las <code>DESTACADAS</code>=3 canciones reales —título, artista y género—
+    entran al system prompt (<code>app.py:1095-1109</code>). El modelo no ve IDs, ni scores, ni el catálogo completo.</li>
+    <li><b>Redacción, validación y corrección.</b> <code>validar_respuesta</code> (<code>conversacion.py:615</code>)
+    descarta citas inventadas, numeraciones sueltas y ecos del prompt; si nada es aprovechable se usa
+    <code>respuesta_determinista</code> (<code>conversacion.py:258</code>) para que el usuario nunca reciba un vacío.</li>
+    <li><b>Tarjetas y telemetría.</b> La tanda completa sale en tarjetas con nombre real y enlace a Spotify o YouTube;
+    el turno se escribe en <code>events_*.jsonl</code> con latencias por fase, señales aplicadas, desvíos de ánimo y
+    cobertura del M3.</li>
+  </ol>
+
+  <div class="callout">
+    <h4>Garantía de que la voz no miente</h4>
+    <p>La lista que escucha el usuario es la lista que eligieron los transformers. <code>garantizar_canciones</code>
+    y <code>descartar_citas_inventadas</code> empujan en las dos direcciones: si el LLM omitió una destacada real, se
+    añade; si citó una que no está, se quita. En la demo pública este validador rechazó y reintentó
+    <b>6 respuestas</b> — número que también queda en los logs.</p>
+  </div>
+</section>
+
+<section id="orquestacion">
+  <div class="sec-head"><span class="sec-num">10</span><h2>Orquestación: memoria, validador y cadena de LLM</h2></div>
+
+  <h3>Memoria de sesión</h3>
+  <p class="mono"><code>CONVERSACIONES</code> <code>app.py:250</code> · recorte <code>app.py:269</code></p>
+  <table>
+    <thead><tr><th>Campo</th><th>Valor</th><th>Razón</th></tr></thead>
+    <tbody>
+      <tr><td>Estructura</td><td><code>{session_id: {messages, recomendados, ts, ultima_query_en, perfil_pedido, ultimos_nombres}}</code></td>
+      <td>«dame más» necesita tres cosas: no repetir, mantener el vibe y hablar distinto a lo de hace dos turnos</td></tr>
+      <tr><td>TTL</td><td>2 horas</td><td>Suficiente para una sesión de escucha real, sin crecimiento indefinido</td></tr>
+      <tr><td>Historial al LLM</td><td>Últimos 10 mensajes (hasta 6 turnos al refinar intención)</td><td>Contexto útil sin pagar tokens de más en CPU</td></tr>
+      <tr><td>Límite de sesiones</td><td>500</td><td>Frontera dura de memoria en una VM de estudiante</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Validador de respuesta (los cinco filtros)</h3>
+  <table>
+    <thead><tr><th>Filtro</th><th>Qué atrapa</th><th>Línea</th></tr></thead>
+    <tbody>
+      <tr><td><code>canciones_citadas</code> / <code>garantizar_canciones</code></td><td>Que la voz mencione las
+      destacadas reales y ninguna otra</td><td><code>conversacion.py:433, 448</code></td></tr>
+      <tr><td><code>descartar_citas_inventadas</code></td><td>Títulos plausibles que no están en la tanda</td><td><code>conversacion.py:506</code></td></tr>
+      <tr><td><code>limpiar_ecos_de_lista</code> / <code>limpiar_numeraciones</code></td><td>El eco del prompt y las
+      listas numeradas que delatan el contexto interno</td><td><code>conversacion.py:402, 416</code></td></tr>
+      <tr><td><code>_sin_nombre</code> / <code>corregir_parejas_artista</code></td><td>Filas sin título real y
+      parejas artista-canción cruzadas</td><td><code>conversacion.py:89, 540</code></td></tr>
+      <tr><td><code>texto_aprovechable</code> + <code>cerrar_con_pregunta</code></td><td>Respuestas vacías o
+      cerradas; toda tanda termina con una pregunta para sostener la conversación</td><td><code>conversacion.py:577, 492</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cadena de proveedores del LLM</h3>
+  <p class="mono"><code>llm_client.py:141-222</code></p>
+  <p>Orden por defecto: <code>custom → groq → dashscope → openrouter → hf → ollama</code>. En la VM se fija
+  <code>LLM_ORDER=custom</code>, que apunta al Qwen 2.5-1.5B servido por llama.cpp en el contenedor vecino
+  (<code>llm_client.py:149</code>). Si el proveedor custom no responde, el orquestador no falla: cae al camino
+  determinista y el usuario sigue recibiendo una tanda coherente, solo que sin prosa.</p>
+
+  <h3>Guardrails de la API</h3>
+  <table>
+    <thead><tr><th>Guardia</th><th>Valor</th><th>Línea</th></tr></thead>
+    <tbody>
+      <tr><td>Rate limit de chat</td><td>12 peticiones por minuto por IP</td><td><code>limite.py:54</code></td></tr>
+      <tr><td>Rate limit de feedback</td><td>40 por minuto</td><td><code>app.py:1289-1296</code></td></tr>
+      <tr><td>Cuerpo máximo</td><td>16 KB</td><td><code>app.py:1289-1296</code></td></tr>
+      <tr><td>Identidad real del visitante</td><td>Se desempaca <code>X-Forwarded-For</code> del túnel; si el proxy
+      es local se ignora para no mezclar IP pública con tunelizada</td><td><code>limite.py:21-45</code></td></tr>
+      <tr><td>Endpoints de administración</td><td>Protegidos con <code>ADMIN_TOKEN</code></td><td><code>app.py:1346-1402</code></td></tr>
+      <tr><td>Temperatura de generación</td><td>0,5 en chat; 0,1 al refinar intención</td><td><code>azure-compose.yaml:33-64</code>, <code>app.py:1007</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="api">
+  <div class="sec-head"><span class="sec-num">11</span><h2>API y frontend</h2></div>
+  <p class="mono"><code>app.py:1298-1450</code></p>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Método</th><th>Qué hace</th><th>Línea</th></tr></thead>
+    <tbody>
+      <tr><td><code>/</code></td><td>GET</td><td>Frontend de la demo (chat + tarjetas + encuesta)</td><td><code>app.py:1298</code></td></tr>
+      <tr><td><code>/api/chat</code></td><td>POST</td><td>Un turno completo: intención → M2 → selección → M3 → LLM → tanda</td><td><code>app.py:1301</code></td></tr>
+      <tr><td><code>/api/chat/reset</code></td><td>POST</td><td>Limpiar la memoria de la sesión</td><td><code>app.py:1324</code></td></tr>
+      <tr><td><code>/api/health</code></td><td>GET</td><td>Estado de servicios y modelos cargados</td><td><code>app.py:1331</code></td></tr>
+      <tr><td><code>/api/llm/status · /revive · /probar</code></td><td>GET/POST</td><td>Observabilidad del proveedor LLM (token de admin)</td><td><code>app.py:1362-1402</code></td></tr>
+      <tr><td><code>/api/feedback</code></td><td>POST</td><td>Etiqueta «Me gusta» sobre una canción exacta de la tanda</td><td><code>app.py:1405</code></td></tr>
+      <tr><td><code>/api/metrics</code></td><td>GET</td><td>Métricas acumuladas: turnos, latencias, cobertura, géneros entregados</td><td><code>app.py:1443</code></td></tr>
+    </tbody>
+  </table>
+  <h3>Qué se escribe en disco</h3>
+  <ul class="tight">
+    <li><code>logs/events_*.jsonl</code> — un registro por turno: mensaje, tipo de turno, keywords, señales aplicadas,
+    desvíos de ánimo y género, <code>cobertura_m3</code>, latencias por fase, la tanda entregada con sus posiciones.</li>
+    <li><code>logs/feedback_*.jsonl</code> — la etiqueta del visitante, cruzable con el evento por <code>session_id</code>
+    y posición.</li>
+    <li><code>logs/informe_evaluacion.md/.json</code> — salida de <code>scripts/evaluar_metricas.py</code>.</li>
+  </ul>
+  <p class="small">Nada de esto se calcula en vivo: la demo solo escribe, y el análisis corre después en lote. Así la
+  instrumentación no sesga la latencia que reporta.</p>
+</section>
+
+<section id="despliegue">
+  <div class="sec-head"><span class="sec-num">12</span><h2>Despliegue: VM estudiantil, Docker Compose y túnel HTTPS</h2></div>
+  <p class="mono">Manifiesto: <code>deploy/azure-compose.yaml</code></p>
+
+  <div class="grid g2">
+    <div class="card"><h3>Los cuatro servicios</h3>
+      <ul class="tight">
+        <li><b><code>qwen</code></b> — imagen de llama.cpp fijada por digest, sirve Qwen2.5-1.5B (GGUF Q4_K_M) y
+        escucha <em>solo</em> dentro de la red interna del compose (:8080). Nunca se publica.</li>
+        <li><b><code>app</code></b> — imagen <code>echopulse-azure:demo</code>, Flask + gunicorn en el puerto 7860,
+        con <code>TABLA_MAESTRA_DIR=/app/tabla_maestra/train</code> y <code>LLM_ORDER=custom</code>.</li>
+        <li><b><code>tunnel</code></b> — ngrok (imagen oficial <code>ngrok/ngrok:alpine</code>) como respaldo.</li>
+        <li><b><code>tunnel-cf</code></b> — <code>cloudflared</code>: el túnel que quedó activo, sin pantalla de
+        advertencia para el visitante.</li>
+      </ul></div>
+    <div class="card accent"><h3>Volúmenes y persistencia</h3>
+      <ul class="tight">
+        <li><code>qwen-models</code> — el GGUF descargado una sola vez; sin esto cada arranque volvería a bajar el modelo.</li>
+        <li><code>app-logs</code> — los JSONL de telemetría sobreviven a los rebuilds y de ahí sale la evaluación.</li>
+        <li>Los artefactos del modelo viajan montados, no incrustados: el checkpoint de 127 MB y la Tabla Maestra no
+        cambian cuando cambia el código.</li>
+      </ul></div>
+  </div>
+
+  <h3>Decisión de seguridad: exponer 7860 y cerrar 80</h3>
+  <p>El <code>app</code> publica <code>127.0.0.1:7860</code> para poder probar en la propia VM y
+  <code>80:7860</code> para el túnel. El <code>qwen</code> no publica puerto alguno: solo lo ve <code>app</code> por
+  el network del compose. Ningún modelo, ni token, ni endpoint de inferencia queda expuesto a internet.</p>
+
+  <h3>Secretos: dónde viven y dónde no</h3>
+  <table>
+    <thead><tr><th>Secreto</th><th>Dónde está</th><th>Dónde <em>no</em> está</th></tr></thead>
+    <tbody>
+      <tr><td><code>NGROK_AUTHTOKEN</code></td><td><code>.env</code> de la VM, con <code>chmod 600</code></td>
+      <td>Ni en el repo, ni en el compose, ni en el chat</td></tr>
+      <tr><td><code>HF_TOKEN</code></td><td>Solo en el <code>.env</code> local del desarrollador</td>
+      <td>El <code>.env</code> no se sube a la VM ni entra a Git</td></tr>
+      <tr><td>Clave privada SSH</td><td>Únicamente en el PC del autor (<code>echopulsevm/echopulse-demo_key.pem</code>)</td>
+      <td>Nunca se copia al servidor</td></tr>
+      <tr><td><code>ADMIN_TOKEN</code></td><td><code>.env</code> de la VM, consumido por los <code>/api/llm/*</code></td>
+      <td>No se comparte con los visitantes de la demo</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Rutina de operación</h3>
+  <ol class="steps">
+    <li><b>Respaldo antes de tocar nada.</b> Copiar el árbol de código en la VM antes de cada redeploy.</li>
+    <li><b>Sincronizar</b> código y artefactos con <code>deploy/subir_artefactos.py</code>.</li>
+    <li><b>Reconstruir solo la app:</b> <code>sudo docker compose up -d --build app</code>. Nunca
+    <code>down</code>: tumbar el stack volvería a descargar el modelo y cortaría la demo.</li>
+    <li><b>Verificar</b> con <code>/api/health</code>, una consulta real por el túnel y un vistazo a
+    <code>docker compose logs --tail app</code> buscando el aviso de embeddings aleatorios (que significaría que
+    <code>embeddings.pt</code> no llegó).</li>
+    <li><b>Exportar telemetría</b> y correr <code>scripts/evaluar_metricas.py</code> para el informe.</li>
+  </ol>
+
+  <div class="callout">
+    <h4>Restricciones que se cumplieron</h4>
+    <p>Sin costo (crédito de Azure for Students), accesible sin que el PC del autor esté encendido, disponible 24/7
+    durante al menos una semana y con nombres reales de canción en lugar de IDs, conservando el enlace a Spotify o
+    YouTube. El enlace activo es el túnel de Cloudflare
+    <span class="mono">zero-programming-opens-detroit.trycloudflare.com</span>, con ngrok como respaldo.</p>
+  </div>
+</section>
+
+<section id="evaluacion">
+  <div class="sec-head"><span class="sec-num">13</span><h2>Evaluación: la mitad offline del paper y la mitad online de la demo</h2></div>
+
+  <h3>13.1 Offline (artículo 22, 20CCC'26)</h3>
+  <table>
+    <thead><tr><th>Métrica</th><th>Valor</th><th>Lectura</th></tr></thead>
+    <tbody>
+      <tr><td>Hit@10</td><td><b>0,312</b></td><td>Una de cada tres consultas aterriza la canción buscada dentro del top-10</td></tr>
+      <tr><td>BERT4Rec (baseline)</td><td>0,158</td><td>Referencia secuencial contextual</td></tr>
+      <tr><td>SASRec (baseline)</td><td>0,164</td><td>Referencia secuencial auto-atentiva</td></tr>
+      <tr><td>ILD</td><td><b>0,497</b> (+45,3 %)</td><td>La tanda deja de ser variaciones del mismo artista</td></tr>
+      <tr><td>EAD</td><td><b>0,327</b> (+157,9 %)</td><td>Sorprendencia: aparece el catálogo profundo</td></tr>
+      <tr><td>SCS</td><td><b>0,741</b></td><td>Coherencia de la tanda con el ánimo pedido</td></tr>
+      <tr><td>Ablación cross-attention</td><td>+14,1 % nDCG@10</td><td>Justifica la fusión letra×técnica</td></tr>
+      <tr><td>Significancia</td><td>p &lt; 0,001</td><td>Diferencias no atribuibles al azar</td></tr>
+      <tr><td>Score híbrido del paper</td><td>α=0,4 · β=0,3 · γ=0,3</td><td>Ponderación reportada en el artículo para la
+      combinación de señales</td></tr>
+    </tbody>
+  </table>
+
+  <h3>13.2 Online (demo pública, informe del 2026-10-28)</h3>
+  <table>
+    <thead><tr><th>Métrica</th><th>Valor</th><th>Nota metodológica</th></tr></thead>
+    <tbody>
+      <tr><td>Turnos registrados</td><td>111</td><td>94 de música · 16 «dame más» · 9 con perfil heredado · 1 pregunta</td></tr>
+      <tr><td>Etiquetas «Me gusta»</td><td>5</td><td>Muestra chica: el ranking online es <b>indicativo</b>, no conclusivo</td></tr>
+      <tr><td>HR@1 / Precision@1</td><td>60 %</td><td>Con modo estricto, el puesto 1 es la canción aprobada</td></tr>
+      <tr><td>Recall@10</td><td>100 %</td><td>Cuando hay etiqueta, la aprobada está siempre en el top-10</td></tr>
+      <tr><td>MRR y NDCG@10</td><td>0,600 / 60 %</td><td>La acierto cae, de promedio, entre el puesto 1 y 2</td></tr>
+      <tr><td>Coherencia de género</td><td>100 % en 67 turnos</td><td>Medible <em>sin</em> etiquetas, contra lo pedido</td></tr>
+      <tr><td>Desvío de ánimo</td><td>0,12 en 69 turnos</td><td>Distancia 0-1 al cuantil de ánimo pedido</td></tr>
+      <tr><td>Latencia p50 / p90</td><td>9,3 s / 13,1 s</td><td>Domina el LLM en CPU</td></tr>
+      <tr><td>Respuestas rechazadas por el validador</td><td>6</td><td>Evidencia de que el guardabarros trabaja</td></tr>
+      <tr><td>Cobertura media del M3</td><td>10,18 %</td><td>Registrada turno por turno</td></tr>
+      <tr><td>Géneros entregados</td><td>rock 779 · blues 490 · pop 276 · country 185 · jazz 117 · hip hop 19 · reggae 14</td>
+      <td>1.880 canciones servidas; el sesgo del catálogo es visible</td></tr>
+    </tbody>
+  </table>
+
+  <h3>13.3 Cómo se calcula cada cosa</h3>
+  <p class="mono"><code>echopulse_llm_orquestator/scripts/evaluar_metricas.py</code></p>
+  <table>
+    <thead><tr><th>Métrica</th><th>Cálculo</th><th>Fuente</th></tr></thead>
+    <tbody>
+      <tr><td>HR@K, Recall@K, Precision@K, MRR, NDCG@K</td><td>Se cruzan <code>events_*.jsonl</code> con
+      <code>feedback_*.jsonl</code> y se mide la posición de la canción aprobada dentro de la tanda</td>
+      <td><code>relevantes</code> <code>:63-68</code>, <code>metricas_etiquetados</code> <code>:79-123</code></td></tr>
+      <tr><td>Modo <b>estricto</b></td><td>Solo cuenta la canción que el visitante marcó</td><td><code>:68</code>, <code>:215</code></td></tr>
+      <tr><td>Modo <b>amplio</b></td><td>Cuenta la tanda completa como relevancia difusa</td><td><code>:245</code></td></tr>
+      <tr><td>Coherencia de género y desvío de ánimo</td><td>Comparan lo pedido con lo entregado, sin necesitar etiqueta</td>
+      <td><code>alineacion</code> <code>:140-165</code></td></tr>
+      <tr><td>Cobertura M3 y latencias p50/p90</td><td>Se promedian los campos que el turno ya escribió en el log</td>
+      <td><code>telemetria</code> <code>:167-195</code></td></tr>
+      <tr><td>Diagnóstico del retrieval</td><td>Ablación de las señales (neural, léxica, perfil, filtros) para
+      explicar un mal ranking sin adivinar</td><td><code>scripts/diagnosticar_retrieval.py</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>13.4 La tercera capa: la encuesta de percepción</h3>
+  <p>El ranking no mide si la conversación se sintió natural. Por eso la demo enlaza un formulario externo
+  (<b>19 escalas + un comentario abierto</b>) desde la interfaz y desde el pie de cada tanda. Es la mitad cualitativa
+  de la evaluación y cubre lo que ninguna métrica de recuperación capta: confianza en la recomendación, sorpresa y
+  percepción de que el sistema entendió el pedido.</p>
+
+  <div class="callout warn">
+    <h4>Cuidado con los números viejos</h4>
+    <p>El archivo <code>echopulse_llm_orquestator/logs/informe_evaluacion.json</code> del repositorio local es de
+    2026-10-27 y reporta 18 eventos, 1 etiqueta y cobertura 0,0833. Los números que van en la tesis y en las
+    láminas son los del informe de la VM del <b>2026-10-28</b> (111 turnos, 5 etiquetas, cobertura 0,1018). Antes de
+    citar cualquiera, hay que regenerarlo contra los logs de la VM.</p>
+  </div>
+</section>
+
+<section id="decisiones">
+  <div class="sec-head"><span class="sec-num">14</span><h2>Decisiones de diseño y por qué se tomaron</h2></div>
+  <table>
+    <thead><tr><th>Decisión</th><th>Alternativa descartada</th><th>Razón</th><th>Evidencia</th></tr></thead>
+    <tbody>
+      <tr><td>Fusión por <b>cross-attention</b></td><td>Concatenar letra y técnica</td><td>La letra puede consultar
+      rasgos específicos; la ablación lo paga con +14,1 % nDCG@10</td><td><code>app.py:464-470</code>, paper</td></tr>
+      <tr><td>Dos transformers separados</td><td>Un modelo único canción+intención</td><td>Fuentes y objetivos
+      distintos; unificarlos obligaría a que TalkPlay2 entre al catálogo, que es justo lo que no ocurre</td>
+      <td><code>app.py:459</code> y <code>app.py:821</code></td></tr>
+      <tr><td>Retrieval <b>híbrido</b> (vector + léxico + perfil)</td><td>Solo búsqueda vectorial</td><td>El vector
+      trae lo inesperado pero no garantiza el género nombrado</td><td><code>app.py:708-716</code></td></tr>
+      <tr><td>Castigos <b>multiplicativos</b> de ánimo/género</td><td>Pesarlos como una señal más</td><td>Con 0,35
+      «tranquilo» devolvía rock; el pedido explícito tiene que dominar</td><td><code>app.py:723-746</code></td></tr>
+      <tr><td>Neutro = <b>mediana</b> de las conocidas</td><td>Otorgar <code>0.0</code> a las desconocidas</td><td>El
+      cero hundía la tanda sin explicar causa; la mediana no premia ni castiga y hace visible la cobertura</td>
+      <td><code>rerank.py:44-60</code></td></tr>
+      <tr><td>Fusión 0,70 similitud / 0,30 intención</td><td>50/50</td><td>La intención solo ve el 10 % del pool;
+      darle mitad del peso sería sobre-ponderar una señal parcial</td><td><code>rerank.py:23-24</code></td></tr>
+      <tr><td>Enriquecer <b>antes</b> de seleccionar</td><td>Seleccionar y nombrar al final</td><td>Hay filas sin
+      título que el caché sí puede nombrar</td><td><code>app.py:1059-1063</code></td></tr>
+      <tr><td>Exclusión de repetidas <b>dentro</b> del retrieval</td><td>Filtrar después del top-k</td><td>Garantiza
+      k canciones nuevas cuando existen; filtrar tarde devuelve tandas cortas</td><td><code>app.py:758-764</code></td></tr>
+      <tr><td>Heurística antes que LLM para la intención</td><td>Siempre preguntar al LLM</td><td>En CPU cada llamada
+      cuesta segundos; la heurística resuelve la mayoría de turnos</td><td><code>app.py:995-1022</code></td></tr>
+      <tr><td>LLM local (Qwen 1,5B GGUF Q4_K_M)</td><td>API comercial</td><td>Costo cero, datos que no salen de la
+      VM y reproducibilidad para la tesis</td><td><code>azure-compose.yaml:2-31</code></td></tr>
+      <tr><td>Validador con respaldo determinista</td><td>Confiar en la salida del modelo</td><td>El usuario nunca
+      recibe una respuesta inventada ni un vacío</td><td><code>conversacion.py:258, 615</code></td></tr>
+      <tr><td>Túnel Cloudflare como frente</td><td>ngrok solo</td><td>Sin pantalla de advertencia para el visitante;
+      ngrok queda de respaldo</td><td><code>azure-compose.yaml:70-113</code></td></tr>
+      <tr><td>Telemetría escrita, análisis en lote</td><td>Métricas calculadas en vivo</td><td>No contamina la
+      latencia que se reporta</td><td><code>evaluar_metricas.py:10</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="limitaciones">
+  <div class="sec-head"><span class="sec-num">15</span><h2>Limitaciones declaradas</h2></div>
+  <div class="grid g2">
+    <div class="card"><h3>Cobertura del Módulo 3</h3>
+      <p>10,18 % de media en la demo. Mientras el pool salga de 5.710 pistas y las clases del re-ranker sean 38.343
+      canciones de TalkPlay, la intención no puede reordenar lo que no conoce. <b>Ruta:</b> re-entrenar el M3 con
+      ids del catálogo servible.</p></div>
+    <div class="card"><h3>Señal de audio no procesada</h3>
+      <p>No se toca el <em>waveform</em>: se trabaja sobre rasgos ya extraídos, letra y metadata. Un transformer
+      de audio real exigiría GPU y rehacer el ETL.</p></div>
+    <div class="card"><h3>Sesgo de catálogo</h3>
+      <p>Rock, blues y pop dominan la entrega (779 y 490 apariciones frente a 19 de hip hop). No hay música en español
+      y el sistema no debe prometer géneros que no puede cumplir.</p></div>
+    <div class="card"><h3>Muestra de la demo</h3>
+      <p>111 turnos y 5 etiquetas. El HR@1 del 60 % es direccional, no estadístico; la encuesta y el crecimiento de
+      la muestra son la forma de cerrar ese hueco antes de la defensa.</p></div>
+    <div class="card"><h3>Anti-repetición imperfecta</h3>
+      <p>La exclusión por sesión funciona, pero «dame más» todavía puede repetir un artista cuando el cupo de
+      reconocidos aprieta. Es la tarea abierta de diversificación.</p></div>
+    <div class="card"><h3>Disponibilidad del túnel</h3>
+      <p>El hostname de un túnel gratuito no es estable ni garantizado 24/7. Para una evaluación larga hace falta
+      un dominio propio o un plan pagano, con el costo que eso implica.</p></div>
+  </div>
+</section>
+
+<section id="archivos">
+  <div class="sec-head"><span class="sec-num">16</span><h2>Mapa de archivos</h2></div>
+  <p class="small">Todas las rutas son relativas a la raíz del repositorio
+  <code>D:\FUP\2026-1\pi\Investigative-Project-On-Steroids</code>.</p>
+  <table>
+    <thead><tr><th>Ruta</th><th>Qué contiene</th><th>Piezas clave</th></tr></thead>
+    <tbody>
+      <tr><td><code>echopulse_llm_orquestator/app.py</code></td><td>Núcleo online: carga de modelos, retrieval,
+      selección, fusión, pipeline y API</td><td><code>459</code> MST_MR · <code>479</code> Module2MasterTable ·
+      <code>653</code> retrieve_top10 · <code>821</code> IntentTransformer · <code>860</code> rerank_candidates ·
+      <code>884</code> seleccionar_candidatos · <code>982</code> procesar_consulta_echopulse ·
+      <code>1298-1450</code> endpoints</td></tr>
+      <tr><td><code>echopulse_llm_orquestator/rerank.py</code></td><td>Fusión pura M2/M3 y diagnóstico de cobertura</td>
+      <td><code>23-24</code> pesos · <code>27</code> fusionar · <code>73</code> diagnóstico</td></tr>
+      <tr><td><code>echopulse_llm_orquestator/conversacion.py</code></td><td>Turnos, prompts, limpieza y validación de
+      la respuesta</td><td><code>24</code> SISTEMA_INTENCION · <code>36</code> SISTEMA_CHAT · <code>126</code>
+      clasificar_mensaje · <code>207</code> detectar_tono · <code>258</code> respuesta_determinista ·
+      <code>615</code> validar_respuesta</td></tr>
+      <tr><td><code>echopulse_llm_orquestator/perfiles.py</code></td><td>Perfil de búsqueda, herencia y desvíos de
+      ánimo/género</td><td><code>109</code> perfil_consulta · <code>138</code> heredar_perfil · <code>188</code>
+      perfil_vector · <code>233</code> distancia_animo · <code>258</code> desvio_genero</td></tr>
+      <tr><td><code>echopulse_llm_orquestator/llm_client.py</code></td><td>Cadena de proveedores y llamada real</td>
+      <td><code>141-222</code></td></tr>
+      <tr><td><code>echopulse_llm_orquestator/limite.py</code></td><td>Rate limiting con IP real del túnel</td>
+      <td><code>21-45</code> · <code>54</code> ventana de 12/min</td></tr>
+      <tr><td><code>echopulse_llm_orquestator/scripts/evaluar_metricas.py</code></td><td>Métricas de ranking,
+      alineación y telemetría desde los JSONL</td><td><code>63</code> · <code>79</code> · <code>140</code> ·
+      <code>167</code></td></tr>
+      <tr><td><code>echopulse_llm_orquestator/scripts/diagnosticar_retrieval.py</code></td><td>Ablación de las señales
+      del Módulo 2</td><td>—</td></tr>
+      <tr><td><code>scripts/build_fame_index.py</code></td><td>Índice de fama desde <code>tracks.csv</code> (545.983 filas)</td>
+      <td>→ <code>models/fame_index.parquet</code></td></tr>
+      <tr><td><code>echopulse_llm_orquestator/models/</code></td><td>Artefactos servibles</td><td><code>tabla_maestra/</code>,
+      <code>talkplay/</code>, <code>fame_index.parquet</code>, <code>song_metadata.json</code>,
+      <code>module3_ids.json</code></td></tr>
+      <tr><td><code>deploy/azure-compose.yaml</code></td><td>Stack de 4 servicios y 2 volúmenes</td>
+      <td><code>2</code> qwen · <code>33</code> app · <code>70</code> tunnel · <code>103</code> tunnel-cf</td></tr>
+      <tr><td><code>deploy/subir_artefactos.py</code></td><td>Sincronización a la VM</td><td>—</td></tr>
+      <tr><td><code>docs/ETLWasabiSongs.ipynb</code></td><td>Limpieza de WASABI y <code>isClassic</code></td><td>—</td></tr>
+      <tr><td><code>docs/etlLyrics1950-2019.ipynb</code></td><td>Letras, percentiles 1/99 y corte temporal</td><td>—</td></tr>
+      <tr><td><code>docs/etlSongs.ipynb</code></td><td>Million Song Dataset → rasgos técnicos</td><td>—</td></tr>
+      <tr><td><code>docs/etlTalkPlay.ipynb</code></td><td>Explosión de diálogos y split 80/10/10 por sesión</td><td>—</td></tr>
+      <tr><td><code>docs/TalkplayTransformer_Intentional.ipynb</code></td><td>Entrenamiento del IntentTransformer</td>
+      <td>→ <code>intent_model.pth</code></td></tr>
+      <tr><td><code>docs/Tabla_Maestra_Transformer.ipynb</code></td><td>Entrenamiento del MST_MR</td>
+      <td>→ <code>mst_mr_final.pth</code></td></tr>
+      <tr><td><code>docs/EchoPulse_AI_presentacion_tesis.pptx</code></td><td>Defensa en 10 minutos: 14 láminas</td><td>—</td></tr>
+      <tr><td><code>docs/doc for sco2/ceurart/paper/paper-largo.tex</code></td><td>Texto del artículo: MICE, MAD,
+      mapeo húngaro y métricas</td><td>líneas 369, 418-428</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="glosario">
+  <div class="sec-head"><span class="sec-num">17</span><h2>Glosario rápido</h2></div>
+  <table>
+    <thead><tr><th>Término</th><th>Significado en este sistema</th></tr></thead>
+    <tbody>
+      <tr><td><b>Tabla Maestra</b></td><td>El corpus de 5.710 pistas resultante de casar WASABI, Lyrics 1950-2019 y MSD.
+      TalkPlay2 <b>no</b> la integra.</td></tr>
+      <tr><td><b>Módulo A</b></td><td>La fase de entrenamiento: los dos transformers y sus artefactos.</td></tr>
+      <tr><td><b>Módulo B / M2</b></td><td>Recuperación (<code>retrieve_top10</code>) sobre el catálogo.</td></tr>
+      <tr><td><b>Módulo C / M3</b></td><td>Re-ranking por intención conversacional y fusión de scores.</td></tr>
+      <tr><td><b>Cobertura M3</b></td><td>Facción de las candidatas que existen como clase en el re-ranker.</td></tr>
+      <tr><td><b>Emergente</b></td><td>Popularidad Spotify &lt; 60 y no <code>isClassic</code>.</td></tr>
+      <tr><td><b>Perfil heredado</b></td><td>Género y ánimo del turno anterior, usados en los turnos «dame más».</td></tr>
+      <tr><td><b>Destacadas</b></td><td>Las 3 canciones que se nombran en voz; la tanda tiene 10.</td></tr>
+      <tr><td><b>Modo estricto / amplio</b></td><td>Contar solo la canción votada, o contar toda la tanda como relevancia.</td></tr>
+      <tr><td><b>ECO del prompt</b></td><td>Fragmentos del contexto interno que el LLM copiaba a la respuesta; se
+      traducen a lenguaje hablado o se descartan.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="wrap">
+  <div class="hr"></div>
+  <p>EchoPulse AI · documento de arquitectura generado del estado real del repositorio el 29-10-2026.
+  Cada línea citada corresponde al código local; si una refactorización mueve una función, el archivo
+  <code>app.py</code> conserva el orden de secciones descrito aquí.</p>
+</footer>
+
+</main>
+</body>
+</html>
