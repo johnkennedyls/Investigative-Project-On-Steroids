@@ -244,6 +244,39 @@ def test_citas_inventadas():
     print("✅ Se descartan citas inventadas y se garantiza una canción real")
 
 
+def test_la_prosa_sin_citas_sobrevive():
+    """Pasillo real de la VM: 25,2 % de los turnos salían deterministas.
+
+    `descartar_citas_inventadas` guardaba solo las frases con citas válidas, así
+    que una respuesta sin comillas ("te armé una tanda con garra para hoy") se
+    vaciaba, `texto_aprovechable` fallaba y el turno caía al motor determinista
+    antes de que `garantizar_canciones` pudiera inyectar la tanda real.
+    """
+    canciones = [
+        {"track_name": "Matilda", "artist_name": "Alt-J"},
+        {"track_name": "Gimme Some Lovin'", "artist_name": "The Spencer Davis Group"},
+    ]
+    sin_citas = "Me encanta ese rumbo: te armo una tanda con bastante garra para hoy."
+    assert conv.descartar_citas_inventadas(sin_citas, canciones) == sin_citas
+
+    valida = conv.validar_respuesta(sin_citas, canciones, turno=0)
+    assert valida is not None, "el turno volvió al motor determinista"
+    assert "Matilda" in valida or "Gimme" in valida, valida
+    assert valida.rstrip().endswith("?"), valida
+
+    # La prosa convive con la frase inventada: se pierde solo esa frase.
+    mezclada = (
+        "Te armé una tanda con bastante garra. "
+        'Escucha "The Night" de Dua Lipa, suena muy actual. '
+        "La segunda va por el mismo lado."
+    )
+    limpio = conv.descartar_citas_inventadas(mezclada, canciones)
+    assert "Dua Lipa" not in limpio, limpio
+    assert "tanda con bastante garra" in limpio, limpio
+    assert "La segunda va por el mismo lado" in limpio, limpio
+    print("✅ La prosa sin citas sobrevive y la tanda real se inyecta")
+
+
 def test_cierre_con_pregunta():
     assert conv.cerrar_con_pregunta("Te dejo «Matilda».", 0).endswith("?")
     ya = "¿Seguimos en esa línea?"
@@ -720,6 +753,7 @@ def main() -> int:
         test_validar_keywords,
         test_tonos_coloquiales,
         test_citas_inventadas,
+        test_la_prosa_sin_citas_sobrevive,
         test_cierre_con_pregunta,
         test_el_refuerzo_no_contamina_el_historial,
         test_validar_respuesta_rechaza_basura,

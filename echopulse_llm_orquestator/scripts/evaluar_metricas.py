@@ -24,6 +24,9 @@ from collections import Counter
 
 Ks = (1, 3, 5, 10)
 
+# Sesiones generadas por nosotros, no por visitantes.
+PREFIJOS_SINTETICOS = ("carga-", "verif-")
+
 
 def sin_acentos(texto):
     nfkd = unicodedata.normalize("NFKD", str(texto or ""))
@@ -49,15 +52,25 @@ def cargar_jsonl(ruta):
     return registros
 
 
-def cargar(logs_dir):
-    eventos, etiquetas = {}, []
+def cargar(logs_dir, incluir_sinteticos=False):
+    """Eventos y etiquetas, separando lo que vino de un visitante de lo que no.
+
+    Las sesiones `carga-` (prueba de latencia) y `verif-` (humo tras un deploy) son
+    tráfico real del sistema pero no personas: si se mezclan, el "n" de la demo y
+    sus métricas dejan de significar lo que parecen.
+    """
+    eventos, etiquetas, excluidos = {}, [], 0
     for ruta in sorted(glob.glob(os.path.join(logs_dir, "events_*.jsonl"))):
         for ev in cargar_jsonl(ruta):
-            if ev.get("id"):
-                eventos[ev["id"]] = ev
+            if not ev.get("id"):
+                continue
+            if not incluir_sinteticos and str(ev.get("session_id") or "").startswith(PREFIJOS_SINTETICOS):
+                excluidos += 1
+                continue
+            eventos[ev["id"]] = ev
     for ruta in sorted(glob.glob(os.path.join(logs_dir, "feedback_*.jsonl"))):
         etiquetas.extend(cargar_jsonl(ruta))
-    return eventos, etiquetas
+    return eventos, etiquetas, excluidos
 
 
 def relevantes(evento, etiqueta, estricto):
@@ -285,12 +298,17 @@ def main():
     parser.add_argument("--logs", default=os.path.join(raiz, "logs"))
     parser.add_argument("--md", default=os.path.join(raiz, "logs", "informe_evaluacion.md"))
     parser.add_argument("--json", dest="json_out", default=os.path.join(raiz, "logs", "informe_evaluacion.json"))
+    parser.add_argument("--incluir-carga", action="store_true",
+                        help="mezcla las sesiones `carga-`/`verif-` con los visitantes (solo para informe de carga)")
     args = parser.parse_args()
 
-    eventos, etiquetas = cargar(args.logs)
+    eventos, etiquetas, excluidos = cargar(args.logs, args.incluir_carga)
     if not eventos:
         print(f"❌ No hay logs/events_*.jsonl en {args.logs}: nada que evaluar.")
         return 1
+    if excluidos:
+        print(f"🚮 {excluidos} turnos sintéticos excluidos (`carga-`/`verif-`): "
+              f"suman latencia, no personas.")
 
     from datetime import datetime
 
@@ -298,6 +316,7 @@ def main():
         "generado": datetime.now().isoformat(timespec="seconds"),
         "eventos_leidos": len(eventos),
         "etiquetas_leidas": len(etiquetas),
+        "sinteticos_excluidos": excluidos,
         "estricto": metricas_etiquetados(eventos, etiquetas, estricto=True),
         "telemetria": telemetria(eventos),
         "alineacion": alineacion(eventos),

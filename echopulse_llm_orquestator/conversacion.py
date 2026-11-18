@@ -523,8 +523,13 @@ def descartar_citas_inventadas(texto: str, candidatos: Sequence[dict]) -> str:
         # títulos; ahora la tanda son las tarjetas y una frase mezclada ("«say
         # yeah» y «blackout»") tiene una cita buena y una que no se muestra, así
         # que se descarta solo si TODAS las citas de la frase son de la lista.
-        if citas and all(_plano(cita).strip() in validos for cita in citas):
-            conservadas.append(frase)
+        # Una frase SIN citas no se juzga: es prosa normal ("te armé una tanda
+        # con garra") y descartarla vaciaba la respuesta hasta volverla
+        # inaprovechable, lo que mandaba el turno al motor determinista y dejaba
+        # a garantizar_canciones sin oportunidad de inyectar la tanda real.
+        if citas and not all(_plano(cita).strip() in validos for cita in citas):
+            continue
+        conservadas.append(frase)
     return " ".join(conservadas).strip()
 
 
